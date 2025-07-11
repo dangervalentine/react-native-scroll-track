@@ -17,20 +17,28 @@
 Try out the scroll track interactively on **Expo Snack**:
 👉 [Open in Snack](https://snack.expo.dev/@dangervalentine/scrolltrackdemo)
 
-### Normal Scrolling
-The scroll indicator syncs with native scrolling to reflect your current position.
+### Demos
 
-![Normal Scrolling](https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/scroll.gif)
+<table>
+  <tr>
+    <td align="center" style="padding: 8px;">
+      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/scroll.gif" alt="Normal Scrolling" width="200" />
+      <br /><strong>Normal Scrolling</strong>
+      <br />The scroll indicator syncs with native scrolling to reflect your current position.
+    </td>
+    <td align="center" style="padding: 8px;">
+      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/tap.gif" alt="Tap to Jump" width="200" />
+      <br /><strong>Tap to Jump</strong>
+      <br />Tap anywhere on the scroll track to instantly jump to that section of your content.
+    </td>
+    <td align="center" style="padding: 8px;">
+      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/drag.gif" alt="Drag to Scroll" width="200" />
+      <br /><strong>Drag to Scroll</strong>
+      <br />Drag the thumb up and down to smoothly scroll through your content.
+    </td>
+  </tr>
+</table>
 
-### Tap to Jump
-Tap anywhere on the scroll track to instantly jump to that section of your content.
-
-![Tap to Jump](https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/tap.gif)
-
-### Drag to Scroll
-Drag the thumb up and down to smoothly scroll through your content.
-
-![Drag to Scroll](https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/drag.gif)
 
 ---
 
@@ -38,6 +46,7 @@ Drag the thumb up and down to smoothly scroll through your content.
 
 ```bash
 npm install react-native-scroll-track
+
 ```
 
 ### Peer dependencies:
