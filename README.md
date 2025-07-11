@@ -12,6 +12,26 @@
 - 🎨 Customizable colors, shadows, sizes
 - ✅ Supports `FlatList`, `ScrollView`, `DraggableFlatList`, etc.
 
+## 🧪 Live Demo
+
+Try out the scroll track interactively on **Expo Snack**:
+👉 [Open in Snack](https://snack.expo.dev/@dangervalentine/scrolltrackdemo)
+
+### Normal Scrolling
+The scroll indicator syncs with native scrolling to reflect your current position.
+
+![Normal Scrolling](https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/scroll.gif)
+
+### Tap to Jump
+Tap anywhere on the scroll track to instantly jump to that section of your content.
+
+![Tap to Jump](https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/tap.gif)
+
+### Drag to Scroll
+Drag the thumb up and down to smoothly scroll through your content.
+
+![Drag to Scroll](https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/drag.gif)
+
 ---
 
 ## Installation
@@ -37,6 +57,48 @@ Follow the installation guide: https://docs.swmansion.com/react-native-reanimate
 Follow the installation guide: https://docs.swmansion.com/react-native-gesture-handler/docs/installation
 
 **Important**: Make sure `react-native-reanimated/plugin` is the **last** plugin in your `babel.config.js`.
+
+---
+
+## ⚠️ Required Setup
+
+**Critical**: You must wrap your app (or at least the component using `ScrollableContainer`) with `GestureHandlerRootView` from `react-native-gesture-handler`. Without this, you'll get the error:
+
+```
+PanGestureHandler must be used as a descendant of GestureHandlerRootView
+```
+
+### Example Setup
+
+```tsx
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+export default function App() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Your app content */}
+      <YourComponent />
+    </GestureHandlerRootView>
+  );
+}
+```
+
+Or if you're using Expo Router:
+
+```tsx
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+export default function RootLayout() {
+  return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+            </Stack>
+            <StatusBar style="dark" />
+        </GestureHandlerRootView>
+  );
+}
+```
 
 ---
 
