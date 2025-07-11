@@ -1,6 +1,6 @@
 {
     "name": "react-native-scroll-track",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "A customizable, interactive scroll indicator for React Native with drag and tap functionality",
     "main": "lib/index.js",
     "module": "lib/index.js",
