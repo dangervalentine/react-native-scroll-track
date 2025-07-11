@@ -1,7 +1,7 @@
-import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    View,
     StyleSheet,
+    View,
 } from "react-native";
 import ScrollProgressTrack from "./ScrollProgressTrack";
 import { useAnimatedScrollPosition } from "./hooks/useAnimatedScrollPosition";
@@ -14,10 +14,13 @@ export interface ScrollableContainerProps {
         onContentSizeChange: (width: number, height: number) => void;
         scrollEventThrottle: number;
         showsVerticalScrollIndicator: boolean;
+        inverted: boolean;
         onDragStart?: () => void;
         onDragEnd?: () => void;
     }) => React.ReactNode;
     style?: any;
+    /** Whether the list is inverted (useful for FlatList with inverted={true}) */
+    inverted?: boolean;
     /** Scroll track styling configuration */
     scrollTrackStyling?: {
         /** Color of the scroll thumb */
@@ -46,6 +49,7 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
     children,
     style,
     scrollTrackStyling = {},
+    inverted = false,
 }) => {
     // Extract alwaysVisible from scrollTrackStyling
     const { alwaysVisible = false } = scrollTrackStyling;
@@ -58,7 +62,7 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
     const [isScrollTrackVisible, setIsScrollTrackVisible] = useState(false);
     const [isTrackAutoHidden, setIsTrackAutoHidden] = useState(true);
     const [isDragInProgress, setIsDragInProgress] = useState(false);
-    const autoHideTimer = useRef<NodeJS.Timeout | null>(null);
+    const autoHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Auto-hide timer functions
     const startAutoHideTimer = useCallback(() => {
@@ -140,6 +144,8 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
         startAutoHideTimer();
 
         const maxOffset = Math.max(0, contentHeight - containerHeight);
+        // Since position now directly represents visual position (0 = top, 1 = bottom),
+        // we use the same calculation for both inverted and non-inverted lists
         const targetOffset = position * maxOffset;
 
         // Sync the animated value immediately to prevent double-tap issue
@@ -224,10 +230,12 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
                     onContentSizeChange: handleContentSizeChange,
                     scrollEventThrottle: 1, // Maximum responsiveness
                     showsVerticalScrollIndicator: false,
+                    inverted: inverted,
                 })}
 
                 {/* Scroll Progress Track */}
                 <ScrollProgressTrack
+                    inverted={inverted}
                     scrollPosition={0} // Fallback for non-animated usage
                     onScrollToPosition={handleScrollToPosition}
                     contentHeight={contentHeight}
