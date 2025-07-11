@@ -149,6 +149,36 @@ const MyScreen = () => {
 
 ## Props
 
+### ScrollableContainer Props
+
+| Prop                | Type      | Description                                          |
+|---------------------|-----------|------------------------------------------------------|
+| `style`             | `any`     | Style object for the container                       |
+| `inverted`          | `boolean` | Whether the list is inverted (useful for FlatList with inverted={true}) |
+| `scrollTrackStyling`| `object`  | Styling configuration for the scroll track (see below) |
+
+#### Inverted Scroll Behavior
+
+When `inverted` is set to `true`, the scroll track behavior is flipped:
+- Tapping at the **bottom** of the track scrolls to the **beginning** of the content (position 0)
+- Tapping at the **top** of the track scrolls to the **end** of the content
+- The thumb position is also inverted to match this behavior
+
+This is useful when working with inverted FlatLists or when you want the scroll track to behave in the opposite direction from the default.
+
+**Note**: The `inverted` prop has currently only been tested with FlatLists. Behavior with other scrollable components may vary.
+
+```tsx
+<ScrollableContainer
+  inverted={true}
+  scrollTrackStyling={{
+    thumbColor: '#AA00FF'
+  }}
+>
+  {/* Your FlatList with inverted={true} */}
+</ScrollableContainer>
+```
+
 ### `scrollTrackStyling` (optional)
 
 Customize the scrollbar's appearance and behavior.
