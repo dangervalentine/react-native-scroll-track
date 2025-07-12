@@ -43,6 +43,10 @@ export interface ScrollableContainerProps {
         /** Whether the track should always be visible (no auto-hide) */
         alwaysVisible?: boolean;
     };
+    /** Callback fired when a press (tap or drag) starts on the scroll track */
+    onPressStart?: () => void;
+    /** Callback fired when a drag ends on the scroll track */
+    onPressEnd?: () => void;
 }
 
 const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
@@ -50,6 +54,8 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
     style,
     scrollTrackStyling = {},
     inverted = false,
+    onPressStart,
+    onPressEnd,
 }) => {
     // Extract alwaysVisible from scrollTrackStyling
     const { alwaysVisible = false } = scrollTrackStyling;
@@ -210,11 +216,13 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
         setIsDragInProgress(true);
         clearAutoHideTimer();
         setIsTrackAutoHidden(false);
+
     }, [clearAutoHideTimer]);
 
     const handleDragEnd = useCallback(() => {
         setIsDragInProgress(false);
         startAutoHideTimer();
+
     }, [startAutoHideTimer]);
 
     // Computed visibility
@@ -246,6 +254,8 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
                     onDragEnd={handleDragEnd}
                     trackWidth={scrollTrackStyling.trackWidth}
                     thumbHeight={scrollTrackStyling.thumbHeight}
+                    onPressStart={onPressStart}
+                    onPressEnd={onPressEnd}
                     styling={{
                         thumbColor: scrollTrackStyling.thumbColor,
                         trackColor: scrollTrackStyling.trackColor,

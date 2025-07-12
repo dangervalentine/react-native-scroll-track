@@ -19,6 +19,8 @@ export interface ScrollProgressTrackProps {
     animatedScrollPosition?: Animated.Value;
     onDragStart?: () => void;
     onDragEnd?: () => void;
+    onPressStart?: () => void;
+    onPressEnd?: () => void;
     styling?: {
         thumbColor?: string;
         trackColor?: string;
@@ -44,6 +46,8 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     animatedScrollPosition,
     onDragStart,
     onDragEnd,
+    onPressStart,
+    onPressEnd,
     inverted = false,
     styling = {},
 }) => {
@@ -146,6 +150,7 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
 
             runOnJS(setIsDragging)(true);
             runOnJS(onDragStart || (() => { }))();
+            runOnJS(onPressStart || (() => { }))();
             runOnJS(directScrollToPosition)(position);
         } else if (state === State.ACTIVE) {
             const currentTouchY = dragStartPosition.current + translationY;
@@ -159,8 +164,9 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
 
             runOnJS(setIsDragging)(false);
             runOnJS(onDragEnd || (() => { }))();
+            runOnJS(onPressEnd || (() => { }))();
         }
-    }, [availableHeight, directScrollToPosition, visible, onDragStart, onDragEnd, dragScale, thumbOpacity, inverted]);
+    }, [availableHeight, directScrollToPosition, visible, onDragStart, onDragEnd, dragScale, thumbOpacity, inverted, onPressStart, onPressEnd]);
 
     const handleTapGesture = useCallback((event: any) => {
         const { state, y } = event.nativeEvent;
