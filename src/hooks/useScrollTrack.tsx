@@ -10,7 +10,7 @@ export interface ScrollTrackOptions {
     disableGestures?: boolean;
     /** Delay in milliseconds before the track fades out when not alwaysVisible. Default: 1000 */
     fadeOutDelay?: number;
-    /** Hit area expansion for gesture detection (in pixels). Default: 36 */
+    /** Hit area expansion for gesture detection (in pixels). Default: 22 */
     hitSlop?: number;
     /** Whether scrolling direction is inverted (thumb moves opposite to scroll). Default: false */
     inverted?: boolean;
@@ -63,7 +63,7 @@ export const defaultScrollTrackOptions = {
     alwaysVisible: false,
     disableGestures: false,
     fadeOutDelay: 1000,
-    hitSlop: 36,
+    hitSlop: 22,
     inverted: false,
     minScrollDistanceToShow: 20,
     onPressEnd: () => { },

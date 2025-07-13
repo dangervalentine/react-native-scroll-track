@@ -55,7 +55,7 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     containerHeight,
     contentHeight,
     disableGestures = false,
-    hitSlop = 36,
+    hitSlop = 22,
     inverted = false,
     onDragEnd,
     onDragStart,
@@ -200,16 +200,19 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
             setIsPressed(true);
             onPressStart?.();
         } else if (state === State.END) {
-            const rawPosition = Math.max(0, Math.min(1, y / availableHeight));
-            const position = inverted ? 1 - rawPosition : rawPosition;
-            onScrollToPosition(position);
+            // Only handle tap if we're not dragging
+            if (!isDragging) {
+                const rawPosition = Math.max(0, Math.min(1, y / availableHeight));
+                const position = inverted ? 1 - rawPosition : rawPosition;
+                onScrollToPosition(position);
+            }
             setIsPressed(false);
             onPressEnd?.();
         } else if (state === State.CANCELLED || state === State.FAILED) {
             setIsPressed(false);
             onPressEnd?.();
         }
-    }, [availableHeight, inverted, onScrollToPosition, onPressStart, onPressEnd]);
+    }, [availableHeight, inverted, onScrollToPosition, onPressStart, onPressEnd, isDragging]);
 
     if (containerHeight < 100 || contentHeight <= containerHeight) return null;
 
@@ -250,23 +253,31 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
                 />
             )}
             {disableGestures ? (
-                <Animated.View style={[styles.pressableArea, { height: availableHeight }]}>
+                <Animated.View style={[styles.pressableArea, { height: availableHeight, width: Math.max(trackWidthProp, 22) }]}>
                     {Thumb}
                 </Animated.View>
             ) : (
-                <TapGestureHandler onHandlerStateChange={handleTapGesture} maxDist={10}>
-                    <PanGestureHandler
-                        onGestureEvent={handleTrackGesture}
-                        onHandlerStateChange={handleTrackGesture}
-                        shouldCancelWhenOutside={false}
-                        minPointers={1}
-                        maxPointers={1}
-                        hitSlop={hitSlop}
-                    >
-                        <Animated.View style={[styles.pressableArea, { height: availableHeight }]}>
-                            {Thumb}
-                        </Animated.View>
-                    </PanGestureHandler>
+                <TapGestureHandler
+                    onHandlerStateChange={handleTapGesture}
+                    maxDist={20}
+                    shouldCancelWhenOutside={true}
+                    hitSlop={hitSlop}
+                >
+                    <Animated.View style={[styles.pressableArea, { height: availableHeight, width: Math.max(trackWidthProp, 22) }]}>
+                        <PanGestureHandler
+                            onGestureEvent={handleTrackGesture}
+                            onHandlerStateChange={handleTrackGesture}
+                            shouldCancelWhenOutside={false}
+                            minPointers={1}
+                            maxPointers={1}
+                            hitSlop={hitSlop}
+                            simultaneousHandlers={undefined}
+                        >
+                            <Animated.View style={[styles.gestureArea, { height: availableHeight, width: Math.max(trackWidthProp, 22) }]}>
+                                {Thumb}
+                            </Animated.View>
+                        </PanGestureHandler>
+                    </Animated.View>
                 </TapGestureHandler>
             )}
         </View>
@@ -285,6 +296,12 @@ const styles = StyleSheet.create({
         position: "absolute",
     },
     pressableArea: {
+        position: "absolute",
+        justifyContent: "flex-start",
+        alignItems: "center",
+        right: 0,
+    },
+    gestureArea: {
         position: "absolute",
         justifyContent: "flex-start",
         alignItems: "center",
