@@ -4,46 +4,102 @@ import ScrollProgressTrack from "../ScrollProgressTrack";
 import { useAnimatedScrollPosition } from "./useAnimatedScrollPosition";
 
 export interface ScrollTrackOptions {
+    /** Whether the scroll track should always be visible (no fade out). Default: false */
     alwaysVisible?: boolean;
+    /** Disable drag and tap gestures on the scroll track. Default: false */
     disableGestures?: boolean;
+    /** Delay in milliseconds before the track fades out when not alwaysVisible. Default: 1000 */
     fadeOutDelay?: number;
+    /** Hit area expansion for gesture detection (in pixels). Default: 36 */
     hitSlop?: number;
+    /** Whether scrolling direction is inverted (thumb moves opposite to scroll). Default: false */
     inverted?: boolean;
+    /** Minimum scroll distance required before showing the track. Default: 20 */
     minScrollDistanceToShow?: number;
+    /** Callback when user starts pressing/dragging the track. Default: empty function */
     onPressEnd?: () => void;
+    /** Callback when user stops pressing/dragging the track. Default: empty function */
     onPressStart?: () => void;
+    /** Throttle scroll events (lower = more responsive, higher = better performance). Default: 1 */
     scrollThrottle?: number;
+    /** Visual styling configuration for the scroll track */
     styling?: {
+        /** Color of the scroll thumb. Default: '#00CED1' */
         thumbColor?: string;
+        /** Border radius of the thumb. Default: 0 */
         thumbBorderRadius?: number;
+        /** Fixed height of the thumb (overrides dynamic sizing). Default: undefined */
         thumbHeight?: number;
+        /** Opacity of the thumb (0-1). Default: 0.8 */
         thumbOpacity?: number;
+        /** Shadow configuration for the thumb */
         thumbShadow?: {
+            /** Shadow color. Default: '#000000' */
             color?: string;
+            /** Shadow opacity (0-1). Default: 0.3 */
             opacity?: number;
+            /** Shadow blur radius. Default: 4 */
             radius?: number;
+            /** Shadow offset. Default: { width: 0, height: 2 } */
             offset?: { width: number; height: number };
         };
+        /** Color of the track background. Default: '#637777' */
         trackColor?: string;
+        /** Opacity of the track (0-1). Default: 0.3 */
         trackOpacity?: number;
+        /** Whether to show the track background. Default: true */
         trackVisible?: boolean;
+        /** Width of the track and thumb. Default: 4 */
         trackWidth?: number;
+        /** Z-index for the scroll track container. Default: 1000 */
         zIndex?: number;
     };
 }
 
+/**
+ * Default configuration options for the scroll track
+ */
+export const defaultScrollTrackOptions = {
+    alwaysVisible: false,
+    disableGestures: false,
+    fadeOutDelay: 1000,
+    hitSlop: 36,
+    inverted: false,
+    minScrollDistanceToShow: 20,
+    onPressEnd: () => { },
+    onPressStart: () => { },
+    scrollThrottle: 1,
+    styling: {
+        thumbColor: '#00CED1',
+        thumbBorderRadius: 0,
+        thumbHeight: undefined as number | undefined,
+        thumbOpacity: 0.8,
+        thumbShadow: {
+            color: '#000000',
+            opacity: 0.3,
+            radius: 4,
+            offset: { width: 0, height: 2 },
+        },
+        trackColor: '#637777',
+        trackOpacity: 0.3,
+        trackVisible: true,
+        trackWidth: 4,
+        zIndex: 1000,
+    },
+} as const;
+
 export const useScrollTrack = (options?: ScrollTrackOptions) => {
     const {
-        alwaysVisible = false,
-        disableGestures = false,
-        fadeOutDelay = 1000,
-        hitSlop = 36,
-        inverted = false,
-        minScrollDistanceToShow = 20,
-        onPressStart,
-        onPressEnd,
-        scrollThrottle = 1,
-        styling = {},
+        alwaysVisible = defaultScrollTrackOptions.alwaysVisible,
+        disableGestures = defaultScrollTrackOptions.disableGestures,
+        fadeOutDelay = defaultScrollTrackOptions.fadeOutDelay,
+        hitSlop = defaultScrollTrackOptions.hitSlop,
+        inverted = defaultScrollTrackOptions.inverted,
+        minScrollDistanceToShow = defaultScrollTrackOptions.minScrollDistanceToShow,
+        onPressStart = defaultScrollTrackOptions.onPressStart,
+        onPressEnd = defaultScrollTrackOptions.onPressEnd,
+        scrollThrottle = defaultScrollTrackOptions.scrollThrottle,
+        styling = defaultScrollTrackOptions.styling,
     } = options || {};
 
     const scrollRef = useRef<any>(null);
