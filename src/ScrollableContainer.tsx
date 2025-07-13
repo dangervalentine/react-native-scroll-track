@@ -6,6 +6,10 @@ import {
 import ScrollProgressTrack from "./ScrollProgressTrack";
 import { useAnimatedScrollPosition } from "./hooks/useAnimatedScrollPosition";
 
+
+/**
+ * @deprecated Use the `useScrollTrack` hook instead. This will be removed in the next major version.
+ */
 export interface ScrollableContainerProps {
     children: (props: {
         scrollRef: React.RefObject<any>;
@@ -49,6 +53,9 @@ export interface ScrollableContainerProps {
     onPressEnd?: () => void;
 }
 
+/**
+ * @deprecated Use the `useScrollTrack` hook instead. This will be removed in the next major version.
+ */
 const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
     children,
     style,
@@ -236,7 +243,7 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
                     onScroll: handleScroll,
                     onLayout: handleContainerLayout,
                     onContentSizeChange: handleContentSizeChange,
-                    scrollEventThrottle: 1, // Maximum responsiveness
+                    scrollEventThrottle: 1,
                     showsVerticalScrollIndicator: false,
                     inverted: inverted,
                 })}
@@ -244,7 +251,7 @@ const ScrollableContainer: React.FC<ScrollableContainerProps> = ({
                 {/* Scroll Progress Track */}
                 <ScrollProgressTrack
                     inverted={inverted}
-                    scrollPosition={0} // Fallback for non-animated usage
+                    scrollPosition={0}
                     onScrollToPosition={handleScrollToPosition}
                     contentHeight={contentHeight}
                     containerHeight={containerHeight}

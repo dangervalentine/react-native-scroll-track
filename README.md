@@ -62,27 +62,20 @@ npm install react-native-reanimated react-native-gesture-handler
 
 ### Additional Setup
 
-For **React Native 0.60+**, you need to complete the installation of the peer dependencies:
-
-#### react-native-reanimated
-Follow the installation guide: https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/installation
-
-#### react-native-gesture-handler
-Follow the installation guide: https://docs.swmansion.com/react-native-gesture-handler/docs/installation
-
-**Important**: Make sure `react-native-reanimated/plugin` is the **last** plugin in your `babel.config.js`.
-
----
+- Ensure `react-native-reanimated/plugin` is the **last** plugin in your `babel.config.js`
+- Follow setup guides for:
+  - [`react-native-reanimated`](https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/installation)
+  - [`react-native-gesture-handler`](https://docs.swmansion.com/react-native-gesture-handler/docs/installation)
+  **Important**: Make sure `react-native-reanimated/plugin` is the **last** plugin in your `babel.config.js`.
 
 ## ⚠️ Required Setup
 
 **Critical**: You must wrap your app (or at least the component using `ScrollableContainer`) with `GestureHandlerRootView` from `react-native-gesture-handler`. Without this, you'll get the error:
-
 ```
 PanGestureHandler must be used as a descendant of GestureHandlerRootView
 ```
 
-### Example Setup
+Wrap your app with `GestureHandlerRootView`:
 
 ```tsx
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -90,131 +83,134 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Your app content */}
       <YourComponent />
     </GestureHandlerRootView>
   );
 }
 ```
 
-Or if you're using Expo Router:
-
-```tsx
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-
-export default function RootLayout() {
-  return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-            </Stack>
-            <StatusBar style="dark" />
-        </GestureHandlerRootView>
-  );
-}
-```
-
 ---
 
-## 📱 Usage
-
-### Basic Usage
+## ✅ Recommended Usage (Hook API)
 
 ```tsx
-import { ScrollableContainer } from 'react-native-scroll-track';
+import { useScrollTrack } from 'react-native-scroll-track';
 
 const MyScreen = () => {
+
+    // These are optional, displayed for illustrative purposes.
+    const scrollTrackOptions: ScrollTrackOptions = {
+        inverted: false,
+        styling: {
+            thumbColor: 'white',
+            trackColor: 'steelblue',
+        },
+        onPressStart: () => console.log("on press start event"),
+        onPressEnd: () => console.log("on press end event"),
+    };
+
+    const { scrollProps, ScrollTrack } = useScrollTrack(scrollTrackOptions);
+
   return (
-    <ScrollableContainer
-      scrollTrackStyling={{ thumbColor: '#AA00FF', alwaysVisible: false }}
-    >
-      {({
-        scrollRef,
-        onScroll,
-        onLayout,
-        onContentSizeChange,
-        scrollEventThrottle,
-        showsVerticalScrollIndicator,
-      }) => (
-        <FlatList
-          ref={scrollRef}
-          onScroll={onScroll}
-          onLayout={onLayout}
-          onContentSizeChange={onContentSizeChange}
-          scrollEventThrottle={scrollEventThrottle}
-          showsVerticalScrollIndicator={showsVerticalScrollIndicator}
-          data={myData}
-          renderItem={renderItem}
-        />
-      )}
-    </ScrollableContainer>
+    <View style={{ flex: 1 }}>
+      <FlatList {...scrollProps} data={data} renderItem={renderItem} />
+      {ScrollTrack}
+    </View>
   );
 };
 ```
 
-### With Custom Styling
+## ❌ Deprecated: `ScrollableContainer`
+
+> The `ScrollableContainer` component is **deprecated** and will be removed in the next major version. Use `useScrollTrack` instead.
 
 ```tsx
-<ScrollableContainer
-  scrollTrackStyling={{
-    thumbColor: '#007AFF',
-    trackColor: '#E5E5E5',
-    trackWidth: 12,
-    thumbShadow: {
-      color: '#000000',
-      opacity: 0.2,
-      radius: 4,
-      offset: { width: 0, height: 2 },
-    },
-    alwaysVisible: false,
-  }}
->
-  {/* Your scrollable content */}
-</ScrollableContainer>
-```
-
-### Inverted Lists (Chat-style)
-
-```tsx
-<ScrollableContainer inverted={true}>
-  {({ scrollRef, onScroll, inverted, ...props }) => (
-    <FlatList
-      ref={scrollRef}
-      onScroll={onScroll}
-      inverted={inverted}
-      {...props}
-      data={messages}
-      renderItem={renderMessage}
-    />
-  )}
-</ScrollableContainer>
-```
-
-### With Callback Functions
-
-```tsx
-<ScrollableContainer
-  scrollTrackStyling={{ thumbColor: '#007AFF' }}
-  onPressStart={() => {
-    console.log('User started interacting with scroll track');
-    // Handle press start - called for both taps and drag start
-  }}
-  onPressEnd={() => {
-    console.log('User ended dragging the scroll track');
-    // Handle drag end - only called when drag gesture ends
-  }}
->
+<ScrollableContainer>
   {({ scrollRef, onScroll, ...props }) => (
     <FlatList
       ref={scrollRef}
       onScroll={onScroll}
       {...props}
-      data={myData}
+      data={data}
       renderItem={renderItem}
     />
   )}
 </ScrollableContainer>
 ```
+
+---
+
+## 🎛️ `useScrollTrack` Hook Options
+
+| Option                     | Type       | Default     | Description |
+|----------------------------|------------|-------------|-------------|
+| `alwaysVisible`            | `boolean`  | `false`     | Prevents auto-hide behavior |
+| `disableGestures`          | `boolean`  | `false`     | Disables tap/drag on scrollbar |
+| `fadeOutDelay`             | `number`   | `1000`      | Delay before fading track (ms) |
+| `hitSlop`                  | `number`   | `36`        | Increases the touchable area of the thumb|
+| `inverted`                 | `boolean`  | `false`     | Reverses track direction (chat-style) |
+| `minScrollDistanceToShow` | `number`   | `20`        | Min scrollable height before track appears |
+| `scrollThrottle`           | `number`   | `1`         | Throttle for scroll events |
+| `styling`                  | `object`   | `{}`        | Styling for track and thumb |
+| `onPressStart`             | `function` |             | Callback when interaction starts |
+| `onPressEnd`               | `function` |             | Callback when interaction ends |
+
+#### `styling` Options
+
+| Key                | Type     | Description |
+|--------------------|----------|-------------|
+| `thumbColor`       | `string` | Thumb color |
+| `trackColor`       | `string` | Track background color |
+| `trackVisible`     | `boolean`| Show/hide track background |
+| `trackOpacity`     | `number` | Opacity of the track |
+| `thumbOpacity`     | `number` | Opacity of the thumb |
+| `trackWidth`       | `number` | Width of the track |
+| `thumbHeight`      | `number` | Fixed height for the thumb |
+| `thumbBorderRadius`| `number` | Border radius of the thumb |
+| `thumbShadow`      | `object` | Shadow style for thumb |
+| `zIndex`           | `number` | z-index of the track |
+
+#### `thumbShadow` Options
+
+| Key     | Type     | Description |
+|---------|----------|-------------|
+| `color`| `string` | Shadow color |
+| `opacity` | `number` | Shadow opacity |
+| `radius` | `number` | Blur radius |
+| `offset` | `object` | `{ width, height }` offset |
+
+---
+
+#### Inverted Scroll Behavior
+
+When `inverted` is set to `true`, the scroll track behavior is flipped:
+- Tapping at the **bottom** of the track scrolls to the **beginning** of the content (position 0)
+- Tapping at the **top** of the track scrolls to the **end** of the content
+- The thumb position is also inverted to match this behavior
+
+This is useful when working with inverted FlatLists or when you want the scroll track to behave in the opposite direction from the default.
+
+**Note**: The `inverted` prop has currently only been tested with FlatLists. Behavior with other scrollable components may vary.
+
+```tsx
+    // These are optional, displayed for illustrative purposes.
+    const scrollTrackOptions: ScrollTrackOptions = {
+        inverted: true,
+    };
+
+    const { scrollProps, ScrollTrack } = useScrollTrack(scrollTrackOptions);
+
+    return (
+        <View style={{ flex: 1 }}>
+            <FlatList {...scrollProps} data={data} renderItem={renderItem} />
+            {ScrollTrack}
+        </View>
+    );
+};
+```
+
+
+## 🎯 Haptic Feedback Example
 
 ### With Haptic Feedback
 
@@ -288,27 +284,23 @@ export const HapticFeedback = {
     selection: () => triggerHapticFeedback("selection"),
 };
 
-<ScrollableContainer
-  scrollTrackStyling={{ thumbColor: '#007AFF' }}
-  onPressStart={() => {
-    // Trigger haptic feedback when user starts interacting
-    triggerHapticFeedback('impactLight');
-  }}
-  onPressEnd={() => {
-    // Trigger different haptic feedback when drag ends
-    triggerHapticFeedback('impactMedium')
-  }}
->
-  {({ scrollRef, onScroll, ...props }) => (
-    <FlatList
-      ref={scrollRef}
-      onScroll={onScroll}
-      {...props}
-      data={myData}
-      renderItem={renderItem}
-    />
-  )}
-</ScrollableContainer>
+import ReactNativeHapticFeedback from "react-native-haptic-feedback";
+import { useScrollTrack } from "react-native-scroll-track";
+
+const MyScreen = () => {
+  const { scrollProps, ScrollTrack } = useScrollTrack({
+    styling: { thumbColor: '#007AFF' },
+    onPressStart: () => triggerHapticFeedback("impactLight"),
+    onPressEnd: () => triggerHapticFeedback("impactMedium"),
+  });
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlatList {...scrollProps} data={myData} renderItem={renderItem} />
+      {ScrollTrack}
+    </View>
+  );
+};
 ```
 
 **Installation:**
@@ -317,189 +309,6 @@ npm install react-native-haptic-feedback
 ```
 
 **Note:** Haptic feedback requires additional platform-specific setup. Follow the installation guide for [`react-native-haptic-feedback`](https://www.npmjs.com/package/react-native-haptic-feedback) to ensure proper functionality across iOS and Android.
-
-### With ScrollView
-
-```tsx
-<ScrollableContainer
-  scrollTrackStyling={{
-    thumbColor: '#007AFF',
-    trackColor: '#E5E5E5',
-    trackWidth: 12,
-    thumbShadow: {
-      color: '#000000',
-      opacity: 0.2,
-      radius: 4,
-      offset: { width: 0, height: 2 },
-    },
-    alwaysVisible: false,
-  }}
->
-  {({ scrollRef, onScroll, onLayout, onContentSizeChange, ...props }) => (
-    <ScrollView
-      ref={scrollRef}
-      onScroll={onScroll}
-      onLayout={onLayout}
-      onContentSizeChange={onContentSizeChange}
-      {...props}
-    >
-      {/* Your content */}
-    </ScrollView>
-  )}
-</ScrollableContainer>
-```
-
-### With SectionList
-
-```tsx
-<ScrollableContainer>
-  {({ scrollRef, onScroll, ...props }) => (
-    <SectionList
-      ref={scrollRef}
-      onScroll={onScroll}
-      {...props}
-      sections={sections}
-      renderItem={renderItem}
-      renderSectionHeader={renderSectionHeader}
-    />
-  )}
-</ScrollableContainer>
-```
-
----
-
-## 🎛️ Props
-
-### ScrollableContainer Props
-
-| Prop                | Type      | Required | Description                                          |
-|---------------------|-----------|----------|------------------------------------------------------|
-| `children`          | `function`| ✅ Yes    | Render function that receives scroll props          |
-| `style`             | `any`     | ❌ No     | Style object for the container                       |
-| `inverted`          | `boolean` | ❌ No     | Whether the list is inverted (useful for FlatList with inverted={true}) |
-| `scrollTrackStyling`| `object`  | ❌ No     | Styling configuration for the scroll track (see below) |
-| `onPressStart`      | `function`| ❌ No     | Callback fired when a press (tap or drag) starts on the scroll track |
-| `onPressEnd`        | `function`| ❌ No     | Callback fired when a drag ends on the scroll track  |
-
-#### Inverted Scroll Behavior
-
-When `inverted` is set to `true`, the scroll track behavior is flipped:
-- Tapping at the **bottom** of the track scrolls to the **beginning** of the content (position 0)
-- Tapping at the **top** of the track scrolls to the **end** of the content
-- The thumb position is also inverted to match this behavior
-
-This is useful when working with inverted FlatLists or when you want the scroll track to behave in the opposite direction from the default.
-
-**Note**: The `inverted` prop has currently only been tested with FlatLists. Behavior with other scrollable components may vary.
-
-```tsx
-<ScrollableContainer
-  inverted={true}
-  scrollTrackStyling={{
-    thumbColor: '#AA00FF'
-  }}
->
-  {/* Your FlatList with inverted={true} */}
-</ScrollableContainer>
-```
-
-### `scrollTrackStyling` (optional)
-
-Customize the scrollbar's appearance and behavior. All properties are optional.
-
-| Prop            | Type     | Required | Description                                |
-|-----------------|----------|----------|--------------------------------------------|
-| `thumbColor`    | `string` | ❌ No     | Color of the draggable thumb               |
-| `trackColor`    | `string` | ❌ No     | Color of the scrollbar track               |
-| `trackVisible`  | `boolean`| ❌ No     | Whether the track background is visible    |
-| `alwaysVisible` | `boolean`| ❌ No     | Prevents the scrollbar from fading out     |
-| `trackWidth`    | `number` | ❌ No     | Width of the track                         |
-| `thumbHeight`   | `number` | ❌ No     | Minimum height of the thumb                |
-| `thumbShadow`   | `object` | ❌ No     | Shadow configuration for the thumb         |
-
-#### `thumbShadow` Configuration
-
-| Prop       | Type     | Description                    |
-|------------|----------|--------------------------------|
-| `color`    | `string` | Shadow color                   |
-| `opacity`  | `number` | Shadow opacity (0-1)           |
-| `radius`   | `number` | Shadow blur radius             |
-| `offset`   | `object` | Shadow offset `{width, height}`|
-
----
-
-## 🎨 Advanced Usage
-
-### Custom Styling Examples
-
-#### iOS-style Scrollbar
-
-```tsx
-<ScrollableContainer
-  scrollTrackStyling={{
-    thumbColor: '#C7C7CC',
-    trackColor: 'transparent',
-    trackWidth: 8,
-    thumbShadow: {
-      color: '#000000',
-      opacity: 0.1,
-      radius: 2,
-      offset: { width: 0, height: 1 },
-    },
-  }}
->
-  {/* Your content */}
-</ScrollableContainer>
-```
-
-#### Material Design Style
-
-```tsx
-<ScrollableContainer
-  scrollTrackStyling={{
-    thumbColor: '#2196F3',
-    trackColor: '#E0E0E0',
-    trackWidth: 12,
-    thumbShadow: {
-      color: '#2196F3',
-      opacity: 0.3,
-      radius: 6,
-      offset: { width: 0, height: 2 },
-    },
-    alwaysVisible: true,
-  }}
->
-  {/* Your content */}
-</ScrollableContainer>
-```
-
-### Performance Optimization
-
-The component is optimized for performance with:
-- Native animations using `react-native-reanimated`
-- Efficient gesture handling with `react-native-gesture-handler`
-- Minimal re-renders through memoization
-- Smooth scrolling with throttled updates
-
----
-
-## 🛠️ Compatibility
-
-- **React Native**: 0.60+
-- **Expo**: SDK 49+
-- **iOS**: 10.0+
-- **Android**: API 21+
-
-### Supported Scroll Components
-
-- ✅ `FlatList`
-- ✅ `SectionList`
-- ✅ `VirtualizedList`
-- ✅ `ScrollView`
-- ✅ `DraggableFlatList` (react-native-draggable-flatlist)
-- ✅ Any component that exposes `scrollToOffset` or `scrollTo` methods
-
----
 
 ## 🚨 Troubleshooting
 
@@ -524,31 +333,36 @@ The package includes TypeScript definitions. Make sure your TypeScript version i
 
 ---
 
-## 🤝 Contributing
+### Performance Optimization
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+The component is optimized for performance with:
+- Native animations using `react-native-reanimated`
+- Efficient gesture handling with `react-native-gesture-handler`
+- Minimal re-renders through memoization
+- Smooth scrolling with throttled updates
 
-### Development Setup
+---
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Run the example: `npm run example`
+## 🛠️ Compatibility
 
-### Issues and Feature Requests
-
-Please use the [GitHub Issues](https://github.com/dangervalentine/react-native-scroll-track/issues) page for bug reports and feature requests.
+- **React Native**: 0.60+
+- **Expo**: SDK 49+
+- **iOS**: 10.0+
+- **Android**: API 21+
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction...
 
 ---
 
 ## 💖 Support
 
-If you like this package, please consider:
+If you like this package:
 
 - ⭐ **Starring** the repository on GitHub
 - 📦 **Sharing** the package with your React Native community

@@ -8,67 +8,90 @@ import { PanGestureHandler, State, TapGestureHandler } from 'react-native-gestur
 import { runOnJS } from 'react-native-reanimated';
 
 export interface ScrollProgressTrackProps {
-    inverted?: boolean;
-    scrollPosition: number;
-    onScrollToPosition: (position: number) => void;
-    contentHeight: number;
-    containerHeight: number;
-    visible?: boolean;
-    trackWidth?: number;
-    thumbHeight?: number;
+    alwaysVisible?: boolean;
     animatedScrollPosition?: Animated.Value;
+    containerHeight: number;
+    contentHeight: number;
+    disableGestures?: boolean;
+    hitSlop?: number;
+    inverted?: boolean;
     onDragStart?: () => void;
     onDragEnd?: () => void;
     onPressStart?: () => void;
     onPressEnd?: () => void;
+    onScrollToPosition: (position: number) => void;
+    /**
+     * @deprecated Use `trackWidth` in the in the styling object instead. This will be removed in the next major version.
+     */
+    trackWidth?: number;
+    thumbHeight?: number;
+    scrollPosition: number;
     styling?: {
+        /**
+         * @deprecated Use `alwaysVisible` in the parent prop (outside of the styling object) instead. This will be removed in the next major version.
+         */
+        alwaysVisible?: boolean;
+        trackWidth?: number;
         thumbColor?: string;
         trackColor?: string;
         trackVisible?: boolean;
+        trackOpacity?: number;
+        thumbOpacity?: number;
+        thumbBorderRadius?: number;
+        zIndex?: number;
         thumbShadow?: {
             color?: string;
             opacity?: number;
             radius?: number;
             offset?: { width: number; height: number };
         };
-        alwaysVisible?: boolean;
     };
+    visible?: boolean;
 }
 
 const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
-    scrollPosition,
-    onScrollToPosition,
-    contentHeight,
-    containerHeight,
-    visible = true,
-    trackWidth = 4,
-    thumbHeight = 24,
+    alwaysVisible = false,
     animatedScrollPosition,
-    onDragStart,
-    onDragEnd,
-    onPressStart,
-    onPressEnd,
+    containerHeight,
+    contentHeight,
+    disableGestures = false,
+    hitSlop = 36,
     inverted = false,
+    onDragEnd,
+    onDragStart,
+    onPressEnd,
+    onPressStart,
+    onScrollToPosition,
+    scrollPosition,
     styling = {},
+    thumbHeight,
+    trackWidth,
+    visible = true,
 }) => {
     const {
+        thumbBorderRadius = 0,
         thumbColor = '#00CED1',
+        thumbOpacity = 0.8,
         trackColor = '#637777',
-        trackVisible = true,
+        trackOpacity = 0.3,
         thumbShadow = {
             color: '#000000',
             opacity: 0.3,
             radius: 4,
             offset: { width: 0, height: 2 },
         },
-        alwaysVisible = false,
+        trackVisible = true,
+        zIndex = 1000,
     } = styling;
 
-    const [isDragging, setIsDragging] = useState(false);
+    const trackWidthProp = styling.trackWidth ?? trackWidth ?? 4;
+    const alwaysVisibleProp = alwaysVisible ?? styling.alwaysVisible ?? false;
 
-    const trackOpacity = useRef(new Animated.Value(0)).current;
-    const thumbOpacity = useRef(new Animated.Value(0)).current;
-    const dragScale = useRef(new Animated.Value(1)).current;
+    const [isDragging, setIsDragging] = useState(false);
+    const [isPressed, setIsPressed] = useState(false);
+
+    const trackOpacityValue = useRef(new Animated.Value(0)).current;
+    const thumbOpacityValue = useRef(new Animated.Value(0)).current;
     const internalScrollPosition = useRef(new Animated.Value(scrollPosition)).current;
 
     useEffect(() => {
@@ -82,26 +105,30 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     }, [scrollPosition, animatedScrollPosition]);
 
     useEffect(() => {
-        const duration = visible ? 0 : 400;
+        const targetTrackOpacity = alwaysVisibleProp || visible ? trackOpacity : 0;
+        const targetThumbOpacity = alwaysVisibleProp || visible ? thumbOpacity : 0;
+        // Skip fade animation during any press interaction (drag or tap)
+        const duration = alwaysVisibleProp || isPressed ? 0 : 400;
+
         Animated.parallel([
-            Animated.timing(trackOpacity, {
-                toValue: visible ? 0.3 : 0,
+            Animated.timing(trackOpacityValue, {
+                toValue: targetTrackOpacity,
                 duration,
                 useNativeDriver: true,
             }),
-            Animated.timing(thumbOpacity, {
-                toValue: visible ? 0.8 : 0,
+            Animated.timing(thumbOpacityValue, {
+                toValue: targetThumbOpacity,
                 duration,
                 useNativeDriver: true,
             }),
         ]).start();
-    }, [visible]);
+    }, [alwaysVisibleProp, visible, trackOpacity, thumbOpacity, isPressed]);
 
     const availableHeight = Math.max(100, containerHeight);
     const calculateThumbHeight = () => {
-        if (contentHeight <= containerHeight) return thumbHeight;
+        if (contentHeight <= containerHeight) return 0;
         const ratio = containerHeight / contentHeight;
-        const dynamicHeight = Math.max(thumbHeight, availableHeight * ratio);
+        const dynamicHeight = availableHeight * ratio;
         return Math.min(dynamicHeight, availableHeight * 0.8);
     };
 
@@ -141,14 +168,13 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
         if (state === State.BEGAN) {
             const touchY = y;
             const rawPosition = Math.max(0, Math.min(1, touchY / availableHeight));
-            // For inverted lists, flip the position so clicking at bottom scrolls to position 0
             const position = inverted ? 1 - rawPosition : rawPosition;
 
             dragStartPosition.current = touchY;
-            dragScale.setValue(1.1);
-            thumbOpacity.setValue(1);
+            thumbOpacityValue.setValue(1);
 
             runOnJS(setIsDragging)(true);
+            runOnJS(setIsPressed)(true);
             runOnJS(onDragStart || (() => { }))();
             runOnJS(onPressStart || (() => { }))();
             runOnJS(directScrollToPosition)(position);
@@ -159,87 +185,90 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
 
             runOnJS(directScrollToPosition)(position);
         } else if (state === State.END || state === State.CANCELLED) {
-            dragScale.setValue(1);
-            thumbOpacity.setValue(visible ? 0.8 : 0);
+            thumbOpacityValue.setValue(visible ? thumbOpacity : 0);
 
             runOnJS(setIsDragging)(false);
+            runOnJS(setIsPressed)(false);
             runOnJS(onDragEnd || (() => { }))();
             runOnJS(onPressEnd || (() => { }))();
         }
-    }, [availableHeight, directScrollToPosition, visible, onDragStart, onDragEnd, dragScale, thumbOpacity, inverted, onPressStart, onPressEnd]);
+    }, [availableHeight, directScrollToPosition, visible, thumbOpacity, onDragStart, onDragEnd, thumbOpacityValue, inverted, onPressStart, onPressEnd]);
 
     const handleTapGesture = useCallback((event: any) => {
         const { state, y } = event.nativeEvent;
-        if (state === State.END) {
+        if (state === State.BEGAN) {
+            setIsPressed(true);
+            onPressStart?.();
+        } else if (state === State.END) {
             const rawPosition = Math.max(0, Math.min(1, y / availableHeight));
             const position = inverted ? 1 - rawPosition : rawPosition;
             onScrollToPosition(position);
+            setIsPressed(false);
+            onPressEnd?.();
+        } else if (state === State.CANCELLED || state === State.FAILED) {
+            setIsPressed(false);
+            onPressEnd?.();
         }
-    }, [availableHeight, inverted, onScrollToPosition]);
+    }, [availableHeight, inverted, onScrollToPosition, onPressStart, onPressEnd]);
 
-    if (containerHeight < 100 || contentHeight < containerHeight) return null;
+    if (containerHeight < 100 || contentHeight <= containerHeight) return null;
+
+    const Thumb = (
+        <Animated.View
+            style={[
+                styles.thumb,
+                {
+                    opacity: thumbOpacityValue,
+                    width: trackWidthProp,
+                    height: currentThumbHeight,
+                    position: "absolute",
+                    right: 0 - trackWidthProp / 2,
+                    transform: [
+                        { translateY: animatedThumbPosition },
+                    ],
+                    backgroundColor: thumbColor,
+                    borderRadius: thumbBorderRadius,
+                    shadowColor: thumbShadow.color,
+                    shadowOffset: thumbShadow.offset,
+                    shadowOpacity: isDragging ? Math.min((thumbShadow.opacity || 0.3) * 1.3, 1) : (thumbShadow.opacity || 0.3),
+                    shadowRadius: isDragging ? (thumbShadow.radius || 4) * 1.5 : (thumbShadow.radius || 4),
+                },
+            ]}
+        />
+    );
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { zIndex }]}>
             {trackVisible && (
                 <Animated.View
-                    style={[
-                        styles.track,
-                        {
-                            opacity: trackOpacity,
-                            width: trackWidth,
-                            height: availableHeight,
-                            backgroundColor: trackColor,
-                        },
-                    ]}
+                    style={[styles.track, {
+                        opacity: trackOpacityValue,
+                        width: trackWidthProp,
+                        height: availableHeight,
+                        backgroundColor: trackColor,
+                    }]}
                 />
             )}
-            <TapGestureHandler
-                onHandlerStateChange={handleTapGesture}
-                maxDist={10}
-            >
-                <PanGestureHandler
-                    onGestureEvent={handleTrackGesture}
-                    onHandlerStateChange={handleTrackGesture}
-                    shouldCancelWhenOutside={false}
-                    minPointers={1}
-                    maxPointers={1}
-                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 0 }}
-                >
-                    <Animated.View
-                        style={[
-                            styles.pressableArea,
-                            {
-                                width: 100,
-                                height: availableHeight,
-                                right: -60,
-                            },
-                        ]}
+            {disableGestures ? (
+                <Animated.View style={[styles.pressableArea, { height: availableHeight }]}>
+                    {Thumb}
+                </Animated.View>
+            ) : (
+                <TapGestureHandler onHandlerStateChange={handleTapGesture} maxDist={10}>
+                    <PanGestureHandler
+                        onGestureEvent={handleTrackGesture}
+                        onHandlerStateChange={handleTrackGesture}
+                        shouldCancelWhenOutside={false}
+                        minPointers={1}
+                        maxPointers={1}
+                        hitSlop={hitSlop}
                     >
-                        <Animated.View
-                            style={[
-                                styles.thumb,
-                                {
-                                    opacity: thumbOpacity,
-                                    width: trackWidth,
-                                    height: currentThumbHeight,
-                                    position: "absolute",
-                                    right: 60 - (trackWidth / 2),
-                                    transform: [
-                                        { translateY: animatedThumbPosition },
-                                        { scale: dragScale },
-                                    ],
-                                    backgroundColor: thumbColor,
-                                    shadowColor: thumbShadow.color,
-                                    shadowOffset: thumbShadow.offset,
-                                    shadowOpacity: isDragging ? Math.min((thumbShadow.opacity || 0.3) * 1.3, 1) : (thumbShadow.opacity || 0.3),
-                                    shadowRadius: isDragging ? (thumbShadow.radius || 4) * 1.5 : (thumbShadow.radius || 4),
-                                },
-                            ]}
-                        />
-                    </Animated.View>
-                </PanGestureHandler>
-            </TapGestureHandler>
+                        <Animated.View style={[styles.pressableArea, { height: availableHeight }]}>
+                            {Thumb}
+                        </Animated.View>
+                    </PanGestureHandler>
+                </TapGestureHandler>
+            )}
         </View>
     );
 };
@@ -251,7 +280,6 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         alignItems: "center",
-        zIndex: 1000,
     },
     track: {
         position: "absolute",
