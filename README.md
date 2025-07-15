@@ -2,9 +2,9 @@
 
 ✨ A customizable, interactive scroll indicator for React Native. Tap or drag to scroll, with animated thumb and auto-hide behavior.
 
-[![npm version](https://badge.fury.io/js/react-native-scroll-track.svg)](https://badge.fury.io/js/react-native-scroll-track)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
+[![npm version](https://badge.fury.io/js/react-native-scroll-track.svg)](https://badge.fury.io/js/react-native-scroll-track)
 
 ---
 
