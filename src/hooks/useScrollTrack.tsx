@@ -99,8 +99,21 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         onPressStart = defaultScrollTrackOptions.onPressStart,
         onPressEnd = defaultScrollTrackOptions.onPressEnd,
         scrollThrottle = defaultScrollTrackOptions.scrollThrottle,
-        styling = defaultScrollTrackOptions.styling,
+        styling: userStyling,
     } = options || {};
+
+    // Merge user styling with defaults, including nested thumbShadow
+    const styling = useMemo(() => {
+        if (!userStyling) return defaultScrollTrackOptions.styling;
+
+        return {
+            ...defaultScrollTrackOptions.styling,
+            ...userStyling,
+            thumbShadow: userStyling.thumbShadow
+                ? { ...defaultScrollTrackOptions.styling.thumbShadow, ...userStyling.thumbShadow }
+                : defaultScrollTrackOptions.styling.thumbShadow,
+        };
+    }, [userStyling]);
 
     const scrollRef = useRef<any>(null);
     const { createScrollHandler, rawScrollValue, setScrollValue } = useAnimatedScrollPosition();
