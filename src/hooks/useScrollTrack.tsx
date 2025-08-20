@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { useAnimatedRef } from "react-native-reanimated";
+
+import type {
+    FlatList,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    SectionList,
+    ScrollView as RNScrollView,
+} from "react-native";
+import type { ScrollView as RNGHScrollView } from "react-native-gesture-handler";
+
+
 import ScrollProgressTrack from "../ScrollProgressTrack";
 import { useAnimatedScrollPosition } from "./useAnimatedScrollPosition";
 
@@ -54,7 +65,15 @@ export interface ScrollTrackOptions {
         /** Z-index for the scroll track container. Default: 1000 */
         zIndex?: number;
     };
+    /** External ref to the scrollable component. Default: null */
+    externalRef?: React.RefObject<SupportedScrollRef> | React.RefObject<any>;
 }
+
+export type SupportedScrollRef =
+    | RNScrollView
+    | RNGHScrollView
+    | FlatList<any>
+    | SectionList<any>;
 
 /**
  * Default configuration options for the scroll track
@@ -100,6 +119,7 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         onPressEnd = defaultScrollTrackOptions.onPressEnd,
         scrollThrottle = defaultScrollTrackOptions.scrollThrottle,
         styling: userStyling,
+        externalRef,
     } = options || {};
 
     // Merge user styling with defaults, including nested thumbShadow
@@ -115,7 +135,7 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         };
     }, [userStyling]);
 
-    const scrollRef = useRef<any>(null);
+    const scrollRef = (externalRef as React.RefObject<any>) ?? useAnimatedRef<any>();
     const { createScrollHandler, rawScrollValue, setScrollValue } = useAnimatedScrollPosition();
 
     const [containerHeight, setContainerHeight] = useState(0);
@@ -254,5 +274,6 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         scrollToPosition,
         isScrollable,
         isVisible: isScrollable && (alwaysVisible || !isAutoHidden),
+        scrollRef
     };
 };

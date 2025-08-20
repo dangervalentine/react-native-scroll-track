@@ -17,34 +17,15 @@
 - 🔄 **Inverted list support** for chat-style interfaces
 - ⚡ **Optimized performance** with native animations
 - 🎯 **Callback functions** for haptic feedback and interaction handling
-- ✅ **Supports** `FlatList`, `ScrollView`, `SectionList`, `DraggableFlatList`, etc.
+- ✅ **Supports** `ScrollView`, `FlatList`, `SectionList`, `FlashList`, `DraggableFlatList`, etc.
+- 🆕 **Ref forwarding support** – integrate cleanly with parent gestures and carousels
+
+---
 
 ## 🧪 Live Demo
 
 Try out the scroll track interactively on **Expo Snack**:
 👉 [Open in Snack](https://snack.expo.dev/@dangervalentine/scrolltrackdemo)
-
-### Visual Demos
-
-<table>
-  <tr>
-    <td align="center" style="padding: 8px;">
-      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/scroll.gif" alt="Normal Scrolling" width="200" />
-      <br /><strong>Normal Scrolling</strong>
-      <br />The scroll indicator syncs with native scrolling to reflect your current position.
-    </td>
-    <td align="center" style="padding: 8px;">
-      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/tap.gif" alt="Tap to Jump" width="200" />
-      <br /><strong>Tap to Jump</strong>
-      <br />Tap anywhere on the scroll track to instantly jump to that section of your content.
-    </td>
-    <td align="center" style="padding: 8px;">
-      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/drag.gif" alt="Drag to Scroll" width="200" />
-      <br /><strong>Drag to Scroll</strong>
-      <br />Drag the thumb up and down to smoothly scroll through your content.
-    </td>
-  </tr>
-</table>
 
 ---
 
@@ -149,11 +130,14 @@ const MyScreen = () => {
 | `fadeOutDelay`             | `number`   | `1000`      | Delay before fading track (ms) |
 | `hitSlop`                  | `number`   | `36`        | Increases the touchable area of the thumb|
 | `inverted`                 | `boolean`  | `false`     | Reverses track direction (chat-style) |
-| `minScrollDistanceToShow` | `number`   | `20`        | Min scrollable height before track appears |
+| `minScrollDistanceToShow`  | `number`   | `20`        | Min scrollable height before track appears |
 | `scrollThrottle`           | `number`   | `1`         | Throttle for scroll events |
 | `styling`                  | `object`   | `{}`        | Styling for track and thumb |
 | `onPressStart`             | `function` |             | Callback when interaction starts |
 | `onPressEnd`               | `function` |             | Callback when interaction ends |
+| `onDragStart`	             | `function` |             | Callback when thumb drag starts |
+| `onDragEnd`	             | `function` |             | Callback when thumb drag ends |
+| `externalRef`	             | `ref`      |             | Supply your own list ref (FlatList, ScrollView, FlashList) |
 
 #### `styling` Options
 
