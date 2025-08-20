@@ -4,7 +4,7 @@ import {
     StyleSheet,
     View,
 } from "react-native";
-import { PanGestureHandler, State, TapGestureHandler } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, State } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
 export interface ScrollProgressTrackProps {
@@ -240,45 +240,95 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
         />
     );
 
+    const safeOnDragStart = onDragStart ?? (() => { });
+    const safeOnDragEnd = onDragEnd ?? (() => { });
+    const safeOnPressStart = onPressStart ?? (() => { });
+    const safeOnPressEnd = onPressEnd ?? (() => { });
+
+    const pan = Gesture.Pan()
+        .minPointers(1)
+        .maxPointers(1)
+        .hitSlop(hitSlop)
+        .shouldCancelWhenOutside(false)
+        .onBegin(() => {
+            'worklet';
+            runOnJS(safeOnDragStart)();
+            runOnJS(safeOnPressStart)();
+        })
+        .onUpdate((e) => {
+            'worklet';
+            // Convert local Y to [0..1] along the track, then apply inversion
+            const raw = Math.max(0, Math.min(1, e.y / Math.max(1, availableHeight)));
+            const pos = inverted ? 1 - raw : raw;
+            runOnJS(onScrollToPosition)(pos);
+        })
+        .onFinalize(() => {
+            'worklet';
+            // finalize covers END/FAIL/CANCEL
+            runOnJS(safeOnDragEnd)();
+            runOnJS(safeOnPressEnd)();
+        });
+
+    const tap = Gesture.Tap()
+        .maxDistance(20)  // matches your previous maxDist
+        .hitSlop(hitSlop)
+        .onBegin(() => {
+            'worklet';
+            runOnJS(safeOnPressStart)();
+        })
+        .onEnd((e) => {
+            'worklet';
+            const raw = Math.max(0, Math.min(1, e.y / Math.max(1, availableHeight)));
+            const pos = inverted ? 1 - raw : raw;
+            runOnJS(onScrollToPosition)(pos);
+            runOnJS(safeOnPressEnd)();
+        });
+
+    const gesture = Gesture.Simultaneous(tap, pan);
+
     return (
         <View style={[styles.container, { zIndex }]}>
             {trackVisible && (
                 <Animated.View
-                    style={[styles.track, {
-                        opacity: trackOpacityValue,
-                        width: trackWidthProp,
-                        height: availableHeight,
-                        backgroundColor: trackColor,
-                    }]}
+                    style={[
+                        styles.track,
+                        {
+                            opacity: trackOpacityValue,
+                            width: trackWidthProp,
+                            height: availableHeight,
+                            backgroundColor: trackColor,
+                        },
+                    ]}
                 />
             )}
+
             {disableGestures ? (
-                <Animated.View style={[styles.pressableArea, { height: availableHeight, width: Math.max(trackWidthProp, 22) }]}>
+                <Animated.View
+                    style={[
+                        styles.pressableArea,
+                        { height: availableHeight, width: Math.max(trackWidthProp, 22) },
+                    ]}
+                >
                     {Thumb}
                 </Animated.View>
             ) : (
-                <TapGestureHandler
-                    onHandlerStateChange={handleTapGesture}
-                    maxDist={20}
-                    shouldCancelWhenOutside={true}
-                    hitSlop={hitSlop}
-                >
-                    <Animated.View style={[styles.pressableArea, { height: availableHeight, width: Math.max(trackWidthProp, 22) }]}>
-                        <PanGestureHandler
-                            onGestureEvent={handleTrackGesture}
-                            onHandlerStateChange={handleTrackGesture}
-                            shouldCancelWhenOutside={false}
-                            minPointers={1}
-                            maxPointers={1}
-                            hitSlop={hitSlop}
-                            simultaneousHandlers={undefined}
+                <GestureDetector gesture={gesture}>
+                    <Animated.View
+                        style={[
+                            styles.pressableArea,
+                            { height: availableHeight, width: Math.max(trackWidthProp, 22) },
+                        ]}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.gestureArea,
+                                { height: availableHeight, width: Math.max(trackWidthProp, 22) },
+                            ]}
                         >
-                            <Animated.View style={[styles.gestureArea, { height: availableHeight, width: Math.max(trackWidthProp, 22) }]}>
-                                {Thumb}
-                            </Animated.View>
-                        </PanGestureHandler>
+                            {Thumb}
+                        </Animated.View>
                     </Animated.View>
-                </TapGestureHandler>
+                </GestureDetector>
             )}
         </View>
     );
