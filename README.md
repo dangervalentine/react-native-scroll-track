@@ -51,7 +51,7 @@ npm install react-native-reanimated react-native-gesture-handler
 
 ## ⚠️ Required Setup
 
-**Critical**: You must wrap your app (or at least the component using `ScrollableContainer`) with `GestureHandlerRootView` from `react-native-gesture-handler`. Without this, you'll get the error:
+**Critical**: You must wrap your app (or at least the component rendering the scroll track) with `GestureHandlerRootView` from `react-native-gesture-handler`. Without this, you'll get the error:
 ```
 PanGestureHandler must be used as a descendant of GestureHandlerRootView
 ```
@@ -101,22 +101,36 @@ const MyScreen = () => {
 };
 ```
 
-## ❌ Deprecated: `ScrollableContainer`
+## 🚨 Removed in 2.0: `ScrollableContainer` and the legacy props
 
-> The `ScrollableContainer` component is **deprecated** and will be removed in the next major version. Use `useScrollTrack` instead.
+`ScrollableContainer` and the deprecated props on `ScrollProgressTrack` have
+been **removed**. `useScrollTrack` is now the only API. See
+[CHANGELOG.md](./CHANGELOG.md) for the full list.
+
+| Removed | Replacement |
+|---------|-------------|
+| `ScrollableContainer` / `ScrollableContainerProps` | `useScrollTrack` |
+| `ScrollProgressTrack` prop `trackWidth` | `styling.trackWidth` |
+| `ScrollProgressTrack` prop `thumbHeight` | `styling.thumbHeight` |
+| `styling.alwaysVisible` | the `alwaysVisible` prop |
+
+Replace a `ScrollableContainer` render-prop tree with the hook:
 
 ```tsx
+// Before
 <ScrollableContainer>
   {({ scrollRef, onScroll, ...props }) => (
-    <FlatList
-      ref={scrollRef}
-      onScroll={onScroll}
-      {...props}
-      data={data}
-      renderItem={renderItem}
-    />
+    <FlatList ref={scrollRef} onScroll={onScroll} {...props} data={data} renderItem={renderItem} />
   )}
 </ScrollableContainer>
+
+// After
+const { scrollProps, ScrollTrack } = useScrollTrack();
+
+<View style={{ flex: 1 }}>
+  <FlatList {...scrollProps} data={data} renderItem={renderItem} />
+  {ScrollTrack}
+</View>
 ```
 
 ---
