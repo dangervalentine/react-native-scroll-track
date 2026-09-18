@@ -23,7 +23,18 @@ module.exports = {
     testEnvironment: 'jsdom',
     globals: {
         'ts-jest': {
-            tsconfig: 'tsconfig.json',
+            // Inherits tsconfig.json, but overrides jsx: the build keeps
+            // "react-native" so Metro/Babel handles JSX, while ts-jest has no
+            // Babel step after it and must emit plain JS itself. "react-jsx"
+            // (automatic runtime) matches Metro and needs no React in scope.
+            tsconfig: {
+                jsx: 'react-jsx',
+            },
+            // Dependencies are transformed (see transformIgnorePatterns) but are
+            // not ours to type-check; only report diagnostics for our own code.
+            diagnostics: {
+                exclude: ['**/node_modules/**'],
+            },
         },
     },
 };

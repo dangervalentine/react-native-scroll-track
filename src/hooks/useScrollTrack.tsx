@@ -39,8 +39,10 @@ export interface ScrollTrackOptions {
         thumbColor?: string;
         /** Border radius of the thumb. Default: 0 */
         thumbBorderRadius?: number;
-        /** Fixed height of the thumb (overrides dynamic sizing). Default: undefined */
+        /** Fixed height of the thumb in pixels. Overrides dynamic sizing and `minThumbHeight`; clamped to the track height. Default: undefined */
         thumbHeight?: number;
+        /** Minimum height of the dynamically sized thumb in pixels. Ignored when `thumbHeight` is set. Default: undefined */
+        minThumbHeight?: number;
         /** Opacity of the thumb (0-1). Default: 0.8 */
         thumbOpacity?: number;
         /** Shadow configuration for the thumb */
@@ -92,6 +94,7 @@ export const defaultScrollTrackOptions = {
         thumbColor: '#00CED1',
         thumbBorderRadius: 0,
         thumbHeight: undefined as number | undefined,
+        minThumbHeight: undefined as number | undefined,
         thumbOpacity: 0.8,
         thumbShadow: {
             color: '#000000',

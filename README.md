@@ -149,10 +149,33 @@ const MyScreen = () => {
 | `trackOpacity`     | `number` | Opacity of the track |
 | `thumbOpacity`     | `number` | Opacity of the thumb |
 | `trackWidth`       | `number` | Width of the track |
-| `thumbHeight`      | `number` | Fixed height for the thumb |
+| `thumbHeight`      | `number` | Fixed height for the thumb, in pixels. Overrides proportional sizing and `minThumbHeight` |
+| `minThumbHeight`   | `number` | Minimum height for the proportionally sized thumb, in pixels. Ignored when `thumbHeight` is set |
 | `thumbBorderRadius`| `number` | Border radius of the thumb |
 | `thumbShadow`      | `object` | Shadow style for thumb |
 | `zIndex`           | `number` | z-index of the track |
+
+##### Thumb height
+
+By default the thumb is sized in proportion to how much of the content fits on
+screen, capped at 80% of the track so there is always somewhere to drag it to.
+Two options override that:
+
+- `thumbHeight` pins the thumb to an exact height, ignoring both the proportion
+  and the 80% cap. It is only clamped to the height of the track.
+- `minThumbHeight` keeps the proportional sizing but stops the thumb from
+  shrinking below the given height, which keeps it grabbable on very long lists.
+
+```tsx
+const options = {
+    styling: {
+        // Always at least 48px tall, however long the list gets.
+        minThumbHeight: 48,
+    },
+};
+```
+
+Both are unset by default. If both are set, `thumbHeight` wins.
 
 #### `thumbShadow` Options
 

@@ -35,6 +35,13 @@ jest.mock('react-native', () => {
 jest.mock('react-native-gesture-handler', () => {
     const View = require('react-native').View;
 
+    const makeGestureMock = () => {
+        const gesture = new Proxy({}, {
+            get: () => () => gesture,
+        });
+        return gesture;
+    };
+
     return {
         PanGestureHandler: ({ children, onGestureEvent, onHandlerStateChange, ...props }) =>
             View({ ...props, onGestureEvent, onHandlerStateChange, children }),
@@ -55,6 +62,14 @@ jest.mock('react-native-gesture-handler', () => {
             DOWN: 8,
         },
         GestureHandlerRootView: ({ children }) => children,
+        // Modern gesture API: every builder method is chainable and returns the
+        // same object, so the component can configure gestures freely.
+        Gesture: {
+            Pan: () => makeGestureMock(),
+            Tap: () => makeGestureMock(),
+            Simultaneous: (...gestures) => makeGestureMock(gestures),
+        },
+        GestureDetector: ({ children }) => children,
     };
 });
 
