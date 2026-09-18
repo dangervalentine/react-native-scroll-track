@@ -7,6 +7,8 @@ import {
 import { Gesture, GestureDetector, State } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
+import { resolveThumbHeight } from './utils/resolveThumbHeight';
+
 export interface ScrollProgressTrackProps {
     alwaysVisible?: boolean;
     animatedScrollPosition?: Animated.Value;
@@ -24,6 +26,9 @@ export interface ScrollProgressTrackProps {
      * @deprecated Use `trackWidth` in the in the styling object instead. This will be removed in the next major version.
      */
     trackWidth?: number;
+    /**
+     * @deprecated Use `thumbHeight` in the styling object instead. This will be removed in the next major version.
+     */
     thumbHeight?: number;
     scrollPosition: number;
     styling?: {
@@ -33,6 +38,8 @@ export interface ScrollProgressTrackProps {
         alwaysVisible?: boolean;
         trackWidth?: number;
         thumbColor?: string;
+        thumbHeight?: number;
+        minThumbHeight?: number;
         trackColor?: string;
         trackVisible?: boolean;
         trackOpacity?: number;
@@ -85,6 +92,8 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     } = styling;
 
     const trackWidthProp = styling.trackWidth ?? trackWidth ?? 4;
+    const thumbHeightProp = styling.thumbHeight ?? thumbHeight;
+    const minThumbHeightProp = styling.minThumbHeight;
     const alwaysVisibleProp = alwaysVisible ?? styling.alwaysVisible ?? false;
 
     const [isDragging, setIsDragging] = useState(false);
@@ -125,14 +134,14 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     }, [alwaysVisibleProp, visible, trackOpacity, thumbOpacity, isPressed]);
 
     const availableHeight = Math.max(100, containerHeight);
-    const calculateThumbHeight = () => {
-        if (contentHeight <= containerHeight) return 0;
-        const ratio = containerHeight / contentHeight;
-        const dynamicHeight = availableHeight * ratio;
-        return Math.min(dynamicHeight, availableHeight * 0.8);
-    };
 
-    const currentThumbHeight = calculateThumbHeight();
+    const currentThumbHeight = resolveThumbHeight({
+        availableHeight,
+        containerHeight,
+        contentHeight,
+        thumbHeight: thumbHeightProp,
+        minThumbHeight: minThumbHeightProp,
+    });
     const maxThumbPosition = Math.max(0, availableHeight - currentThumbHeight);
     const activeScrollPosition = animatedScrollPosition || internalScrollPosition;
     const scrollRange = Math.max(1, contentHeight - containerHeight);
