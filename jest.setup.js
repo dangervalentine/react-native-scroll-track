@@ -21,11 +21,11 @@ jest.mock('react-native', () => {
     });
 
     RN.Animated.timing = jest.fn(() => ({
-        start: jest.fn(),
+        start: jest.fn((callback) => callback?.({ finished: true })),
     }));
 
     RN.Animated.parallel = jest.fn(() => ({
-        start: jest.fn(),
+        start: jest.fn((callback) => callback?.({ finished: true })),
     }));
 
     return RN;
@@ -35,10 +35,25 @@ jest.mock('react-native', () => {
 jest.mock('react-native-gesture-handler', () => {
     const View = require('react-native').View;
 
-    const makeGestureMock = () => {
-        const gesture = new Proxy({}, {
-            get: () => () => gesture,
+    const createdGestures = [];
+
+    const makeGestureMock = (kind) => {
+        const target = { kind, handlers: {}, config: {} };
+        const gesture = new Proxy(target, {
+            get(obj, prop) {
+                if (typeof prop === 'symbol') return undefined;
+                if (prop in obj) return obj[prop];
+                return (...args) => {
+                    if (prop.startsWith('on') && typeof args[0] === 'function') {
+                        obj.handlers[prop] = args[0];
+                    } else {
+                        obj.config[prop] = args.length > 1 ? args : args[0];
+                    }
+                    return gesture;
+                };
+            },
         });
+        createdGestures.push(gesture);
         return gesture;
     };
 
@@ -65,9 +80,18 @@ jest.mock('react-native-gesture-handler', () => {
         // Modern gesture API: every builder method is chainable and returns the
         // same object, so the component can configure gestures freely.
         Gesture: {
-            Pan: () => makeGestureMock(),
-            Tap: () => makeGestureMock(),
-            Simultaneous: (...gestures) => makeGestureMock(gestures),
+            Pan: () => makeGestureMock('pan'),
+            Tap: () => makeGestureMock('tap'),
+            Simultaneous: (...composed) => {
+                const gesture = makeGestureMock('simultaneous');
+                gesture.composed = composed;
+                return gesture;
+            },
+            /** Test helpers: every gesture built since the last __reset(). */
+            __created: createdGestures,
+            __reset: () => {
+                createdGestures.length = 0;
+            },
         },
         GestureDetector: ({ children }) => children,
     };
@@ -76,9 +100,19 @@ jest.mock('react-native-gesture-handler', () => {
 // Mock react-native-reanimated
 jest.mock('react-native-reanimated', () => {
     const Reanimated = require('react-native-reanimated/mock');
+    const { useRef } = require('react');
 
     // Mock runOnJS
     Reanimated.runOnJS = jest.fn((fn) => fn);
+
+    // The stock mock hands back a new object every render, which would reset
+    // any state a worklet keeps across gesture events. Persist it like the
+    // real hook does.
+    Reanimated.useSharedValue = (init) => {
+        const ref = useRef(null);
+        if (ref.current === null) ref.current = { value: init };
+        return ref.current;
+    };
 
     return Reanimated;
 });

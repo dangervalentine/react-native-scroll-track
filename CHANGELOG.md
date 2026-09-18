@@ -23,6 +23,33 @@ entry point, and all visual configuration lives on its `styling` object.
 defaulted, so the fallback chain could not reach it. Anything relying on it was
 already getting the default.
 
+### Changed
+
+Gesture handling on the scroll track, ported from a divergent implementation
+that had been tuned in the field.
+
+- **Scrub updates are movement-gated.** A drag now crosses to the JS thread
+  only once the finger has moved 4px (12px on Android) or 0.4% of the track
+  (0.6% on Android). Previously every pan frame ran a `scrollTo` plus an
+  auto-hide timer reset. The final position is always flushed on release, so
+  the gate can never leave the list short of where the finger stopped.
+- **The gesture strip is inert while the track is hidden.** It spans roughly
+  44px of the right edge and used to accept touches whenever the component was
+  mounted — including at zero opacity — so taps near the right edge of content
+  silently jumped the list. It now accepts touches from the moment the track
+  starts appearing until it has fully faded out.
+- **The gesture is cached.** Three gesture objects were being rebuilt and
+  re-attached on every render; they are now rebuilt only when the track
+  geometry changes. Consumer callbacks are held by stable identity, so passing
+  inline handlers no longer invalidates the cache.
+- **The pan yields to the Android back gesture.** It fails on more than 4px of
+  horizontal movement and activates only past 6px of vertical movement. On
+  Android the touch target is shifted 4px inward, away from the edge the system
+  reserves, and widened to 18px.
+
+Thumb visuals were split out of the gesture overlay so platform touch-target
+adjustments cannot shift the thumb. Rendered position is unchanged.
+
 ### Added
 
 - `styling.minThumbHeight` — a lower bound for the proportionally sized thumb,
@@ -41,8 +68,11 @@ already getting the default.
 - Thumb sizing extracted into a pure `resolveThumbHeight()` with unit tests.
 - Test harness repaired: `.tsx` suites could not run at all, because
   `tsconfig.json` sets `jsx: "react-native"` (JSX preserved for Metro) with no
-  Babel step after ts-jest. Added a test-only `jsx` override, excluded
-  `node_modules` from ts-jest diagnostics, and mocked the modern `Gesture` API.
+  Babel step after ts-jest. Added a test-only `jsx` override and excluded
+  `node_modules` from ts-jest diagnostics.
+- Test mocks made faithful enough to drive a gesture: `Animated` animations
+  invoke their completion callbacks, the `Gesture` builders record handlers and
+  config, and `useSharedValue` persists across renders.
 
 ## 1.2.0
 
