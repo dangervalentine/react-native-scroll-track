@@ -5,7 +5,7 @@ import {
     StyleSheet,
     View,
 } from "react-native";
-import { Gesture, GestureDetector, State } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 
 import { resolveThumbHeight } from './utils/resolveThumbHeight';
@@ -63,6 +63,8 @@ export interface ScrollProgressTrackProps {
     onPressEnd?: () => void;
     onScrollToPosition: (position: number) => void;
     scrollPosition: number;
+    /** Identifier for locating the track in tests. Default: 'scroll-progress-track' */
+    testID?: string;
     styling?: {
         trackWidth?: number;
         thumbColor?: string;
@@ -99,6 +101,7 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     onScrollToPosition,
     scrollPosition,
     styling = {},
+    testID = 'scroll-progress-track',
     visible = true,
 }) => {
     const {
@@ -194,76 +197,6 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
         extrapolate: 'clamp',
     });
 
-    const dragStartPosition = useRef(0);
-    const currentScrollValue = useRef(0);
-
-    useEffect(() => {
-        if (animatedScrollPosition) {
-            const listener = animatedScrollPosition.addListener(({ value }) => {
-                currentScrollValue.current = value;
-            });
-            return () => animatedScrollPosition.removeListener(listener);
-        } else {
-            currentScrollValue.current = scrollPosition * scrollRange;
-        }
-    }, [animatedScrollPosition, scrollPosition, scrollRange]);
-
-    const directScrollToPosition = useCallback((position: number) => {
-        onScrollToPosition(position);
-    }, [onScrollToPosition]);
-
-    const handleTrackGesture = useCallback((event: any) => {
-        'worklet';
-        const { translationY, y, state } = event.nativeEvent;
-
-        if (state === State.BEGAN) {
-            const touchY = y;
-            const rawPosition = Math.max(0, Math.min(1, touchY / availableHeight));
-            const position = inverted ? 1 - rawPosition : rawPosition;
-
-            dragStartPosition.current = touchY;
-            thumbOpacityValue.setValue(1);
-
-            runOnJS(setIsDragging)(true);
-            runOnJS(setIsPressed)(true);
-            runOnJS(onDragStart || (() => { }))();
-            runOnJS(onPressStart || (() => { }))();
-            runOnJS(directScrollToPosition)(position);
-        } else if (state === State.ACTIVE) {
-            const currentTouchY = dragStartPosition.current + translationY;
-            const rawPosition = Math.max(0, Math.min(1, currentTouchY / availableHeight));
-            const position = inverted ? 1 - rawPosition : rawPosition;
-
-            runOnJS(directScrollToPosition)(position);
-        } else if (state === State.END || state === State.CANCELLED) {
-            thumbOpacityValue.setValue(visible ? thumbOpacity : 0);
-
-            runOnJS(setIsDragging)(false);
-            runOnJS(setIsPressed)(false);
-            runOnJS(onDragEnd || (() => { }))();
-            runOnJS(onPressEnd || (() => { }))();
-        }
-    }, [availableHeight, directScrollToPosition, visible, thumbOpacity, onDragStart, onDragEnd, thumbOpacityValue, inverted, onPressStart, onPressEnd]);
-
-    const handleTapGesture = useCallback((event: any) => {
-        const { state, y } = event.nativeEvent;
-        if (state === State.BEGAN) {
-            setIsPressed(true);
-            onPressStart?.();
-        } else if (state === State.END) {
-            // Only handle tap if we're not dragging
-            if (!isDragging) {
-                const rawPosition = Math.max(0, Math.min(1, y / availableHeight));
-                const position = inverted ? 1 - rawPosition : rawPosition;
-                onScrollToPosition(position);
-            }
-            setIsPressed(false);
-            onPressEnd?.();
-        } else if (state === State.CANCELLED || state === State.FAILED) {
-            setIsPressed(false);
-            onPressEnd?.();
-        }
-    }, [availableHeight, inverted, onScrollToPosition, onPressStart, onPressEnd, isDragging]);
 
     // Stable identities so an inline handler from the consumer does not
     // invalidate the cached gesture on every render.
@@ -393,7 +326,7 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     );
 
     return (
-        <View style={[styles.container, { zIndex }]}>
+        <View style={[styles.container, { zIndex }]} testID={testID}>
             {trackVisible && (
                 <Animated.View
                     style={[

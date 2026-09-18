@@ -54,9 +54,15 @@ adjustments cannot shift the thumb. Rendered position is unchanged.
 
 - `styling.minThumbHeight` — a lower bound for the proportionally sized thumb,
   so it stays grabbable on very long lists. Unset by default.
+- `testID` on `ScrollProgressTrack`, defaulting to `'scroll-progress-track'`,
+  so the track can be located in consuming apps' tests.
+- A `LICENSE` file. The package declared MIT but shipped no licence text.
 
 ### Fixed
 
+- `isScrollable` no longer reports `true` for a container of zero or negative
+  height. It also no longer claims the content is scrollable before the
+  container has been laid out.
 - `styling.thumbHeight` is now honored. It was declared in the public API but
   never implemented: the thumb was always sized from the container/content
   ratio, and the value was dropped before it reached the sizing math. An
@@ -65,6 +71,9 @@ adjustments cannot shift the thumb. Rendered position is unchanged.
 
 ### Internal
 
+- Removed ~70 lines of dead code left behind by the gesture-API migration:
+  two orphaned legacy handlers and a scroll listener that fired on every frame
+  to populate a value nothing read.
 - Thumb sizing extracted into a pure `resolveThumbHeight()` with unit tests.
 - Test harness repaired: `.tsx` suites could not run at all, because
   `tsconfig.json` sets `jsx: "react-native"` (JSX preserved for Metro) with no
@@ -72,7 +81,12 @@ adjustments cannot shift the thumb. Rendered position is unchanged.
   `node_modules` from ts-jest diagnostics.
 - Test mocks made faithful enough to drive a gesture: `Animated` animations
   invoke their completion callbacks, the `Gesture` builders record handlers and
-  config, and `useSharedValue` persists across renders.
+  config, and `useSharedValue`/`useAnimatedRef` persist across renders.
+- The whole suite runs again: 146 tests across 10 suites, up from 13. Five
+  suites had been unable to compile since the gesture-API migration. Their
+  gesture tests were rewritten against the modern API, scroll-event fixtures
+  moved behind a typed helper, and the environment corrected to `node`
+  (`jsdom` omits `setImmediate`, which React Native needs).
 
 ## 1.2.0
 

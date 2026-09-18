@@ -147,6 +147,9 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
     const [isDragging, setIsDragging] = useState(false);
 
     const isScrollable = useMemo(() => {
+        // A container with no height cannot scroll, and reports no height until
+        // it has been laid out, so guard against saying otherwise too early.
+        if (containerHeight <= 0) return false;
         return contentHeight - containerHeight > minScrollDistanceToShow;
     }, [contentHeight, containerHeight, minScrollDistanceToShow]);
 
