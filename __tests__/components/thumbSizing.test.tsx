@@ -54,17 +54,6 @@ describe('thumb sizing through the public styling API', () => {
         expect(renderedThumbHeight(toJSON(), thumbColor)).toBe(56);
     });
 
-    it('honours the deprecated top-level thumbHeight prop', () => {
-        const { toJSON } = render(
-            <ScrollProgressTrack
-                {...defaultProps}
-                thumbHeight={56}
-                styling={{ thumbColor }}
-            />
-        );
-        expect(renderedThumbHeight(toJSON(), thumbColor)).toBe(56);
-    });
-
     it('honours styling.minThumbHeight on a long list', () => {
         const { toJSON } = render(
             <ScrollProgressTrack

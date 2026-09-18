@@ -99,7 +99,7 @@ describe('ScrollProgressTrack', () => {
       const { toJSON } = render(
         <ScrollProgressTrack
           {...defaultProps}
-          thumbHeight={100}
+          styling={{ thumbHeight: 100 }}
         />
       );
       expect(toJSON()).toMatchSnapshot();
@@ -452,36 +452,4 @@ describe('ScrollProgressTrack', () => {
     });
   });
 
-  describe('Deprecated props', () => {
-    it('should handle deprecated trackWidth prop', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          trackWidth={8}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-
-    it('should prefer styling.trackWidth over deprecated trackWidth', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          trackWidth={8}
-          styling={{ trackWidth: 12 }}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-
-    it('should handle deprecated styling.alwaysVisible prop', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          styling={{ alwaysVisible: true }}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-  });
 });

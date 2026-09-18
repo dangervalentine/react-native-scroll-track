@@ -22,20 +22,8 @@ export interface ScrollProgressTrackProps {
     onPressStart?: () => void;
     onPressEnd?: () => void;
     onScrollToPosition: (position: number) => void;
-    /**
-     * @deprecated Use `trackWidth` in the in the styling object instead. This will be removed in the next major version.
-     */
-    trackWidth?: number;
-    /**
-     * @deprecated Use `thumbHeight` in the styling object instead. This will be removed in the next major version.
-     */
-    thumbHeight?: number;
     scrollPosition: number;
     styling?: {
-        /**
-         * @deprecated Use `alwaysVisible` in the parent prop (outside of the styling object) instead. This will be removed in the next major version.
-         */
-        alwaysVisible?: boolean;
         trackWidth?: number;
         thumbColor?: string;
         thumbHeight?: number;
@@ -71,8 +59,6 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     onScrollToPosition,
     scrollPosition,
     styling = {},
-    thumbHeight,
-    trackWidth,
     visible = true,
 }) => {
     const {
@@ -91,10 +77,7 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
         zIndex = 1000,
     } = styling;
 
-    const trackWidthProp = styling.trackWidth ?? trackWidth ?? 4;
-    const thumbHeightProp = styling.thumbHeight ?? thumbHeight;
-    const minThumbHeightProp = styling.minThumbHeight;
-    const alwaysVisibleProp = alwaysVisible ?? styling.alwaysVisible ?? false;
+    const trackWidthProp = styling.trackWidth ?? 4;
 
     const [isDragging, setIsDragging] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
@@ -114,10 +97,10 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
     }, [scrollPosition, animatedScrollPosition]);
 
     useEffect(() => {
-        const targetTrackOpacity = alwaysVisibleProp || visible ? trackOpacity : 0;
-        const targetThumbOpacity = alwaysVisibleProp || visible ? thumbOpacity : 0;
+        const targetTrackOpacity = alwaysVisible || visible ? trackOpacity : 0;
+        const targetThumbOpacity = alwaysVisible || visible ? thumbOpacity : 0;
         // Skip fade animation during any press interaction (drag or tap)
-        const duration = alwaysVisibleProp || isPressed ? 0 : 400;
+        const duration = alwaysVisible || isPressed ? 0 : 400;
 
         Animated.parallel([
             Animated.timing(trackOpacityValue, {
@@ -131,7 +114,7 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
                 useNativeDriver: true,
             }),
         ]).start();
-    }, [alwaysVisibleProp, visible, trackOpacity, thumbOpacity, isPressed]);
+    }, [alwaysVisible, visible, trackOpacity, thumbOpacity, isPressed]);
 
     const availableHeight = Math.max(100, containerHeight);
 
@@ -139,8 +122,8 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
         availableHeight,
         containerHeight,
         contentHeight,
-        thumbHeight: thumbHeightProp,
-        minThumbHeight: minThumbHeightProp,
+        thumbHeight: styling.thumbHeight,
+        minThumbHeight: styling.minThumbHeight,
     });
     const maxThumbPosition = Math.max(0, availableHeight - currentThumbHeight);
     const activeScrollPosition = animatedScrollPosition || internalScrollPosition;

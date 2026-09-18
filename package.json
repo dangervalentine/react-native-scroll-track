@@ -8,7 +8,8 @@
     "react-native": "lib/index.js",
     "files": [
         "lib",
-        "README.md"
+        "README.md",
+        "CHANGELOG.md"
     ],
     "scripts": {
         "build": "tsc --project tsconfig.build.json",

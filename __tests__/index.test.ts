@@ -1,5 +1,4 @@
 import {
-    ScrollableContainer,
     ScrollProgressTrack,
     useAnimatedScrollPosition,
     useScrollTrack,
@@ -8,18 +7,12 @@ import {
 
 // Type-only imports for testing
 import type {
-    ScrollableContainerProps,
     ScrollProgressTrackProps,
     ScrollTrackOptions,
 } from '../src';
 
 describe('Library Exports', () => {
     describe('Component exports', () => {
-        it('should export ScrollableContainer', () => {
-            expect(ScrollableContainer).toBeDefined();
-            expect(typeof ScrollableContainer).toBe('function');
-        });
-
         it('should export ScrollProgressTrack', () => {
             expect(ScrollProgressTrack).toBeDefined();
             expect(typeof ScrollProgressTrack).toBe('function');
@@ -57,10 +50,6 @@ describe('Library Exports', () => {
             // This test ensures TypeScript compilation works
             // Types are tested at compile time
 
-            const mockScrollableContainerProps: ScrollableContainerProps = {
-                children: () => null,
-            };
-
             const mockScrollProgressTrackProps: ScrollProgressTrackProps = {
                 containerHeight: 500,
                 contentHeight: 1000,
@@ -73,7 +62,6 @@ describe('Library Exports', () => {
                 fadeOutDelay: 1000,
             };
 
-            expect(mockScrollableContainerProps).toBeDefined();
             expect(mockScrollProgressTrackProps).toBeDefined();
             expect(mockScrollTrackOptions).toBeDefined();
         });
