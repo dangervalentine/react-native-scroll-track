@@ -1,10 +1,11 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useScrollTrack } from '../../src/hooks/useScrollTrack';
+import { scrollEvent } from '../helpers/scrollEvent';
 
 // Mock the ScrollProgressTrack component and animated scroll position
 jest.mock('../../src/ScrollProgressTrack', () => {
-    return function MockScrollProgressTrack(props) {
+    return function MockScrollProgressTrack(props: Record<string, unknown>) {
         return React.createElement('ScrollProgressTrack', {
             ...props,
             testID: 'scroll-progress-track'
@@ -49,13 +50,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible after scroll
@@ -91,13 +86,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible after scroll
@@ -133,13 +122,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible after scroll
@@ -169,13 +152,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // First scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Wait 800ms
@@ -188,13 +165,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Second scroll event - should reset timer
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 200 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 200, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Wait another 800ms (total 1600ms from first scroll)
@@ -228,13 +199,7 @@ describe('Auto-hide Behavior Tests', () => {
             // Simulate rapid scroll events
             act(() => {
                 for (let i = 0; i < 10; i++) {
-                    result.current.scrollProps.onScroll({
-                        nativeEvent: {
-                            contentOffset: { y: i * 50 },
-                            layoutMeasurement: { height: 500 },
-                            contentSize: { height: 1000 },
-                        },
-                    });
+                    result.current.scrollProps.onScroll(scrollEvent({ y: i * 50, containerHeight: 500, contentHeight: 1000 }));
                     jest.advanceTimersByTime(50); // Small increments
                 }
             });
@@ -266,13 +231,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible
@@ -311,13 +270,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should now be visible
@@ -339,13 +292,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible immediately after scroll
@@ -372,13 +319,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible after scroll
@@ -422,13 +363,7 @@ describe('Auto-hide Behavior Tests', () => {
 
             // Simulate scroll event
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
             });
 
             // Should be visible
@@ -464,7 +399,7 @@ describe('Auto-hide Behavior Tests', () => {
             const mockScrollRef = {
                 scrollToOffset: jest.fn(),
             };
-            result.current.scrollProps.ref.current = mockScrollRef;
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = mockScrollRef;
 
             // Call scrollToPosition
             act(() => {

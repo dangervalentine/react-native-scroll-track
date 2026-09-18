@@ -2,7 +2,8 @@ module.exports = {
     preset: 'react-native',
     setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
-    testRegex: '(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$',
+    // only *.test.* / *.spec.* are suites; helpers and .d.ts under __tests__ are not
+    testRegex: '\\.(test|spec)\\.(ts|tsx|js)$',
     testPathIgnorePatterns: ['/node_modules/', '/lib/'],
     collectCoverageFrom: [
         'src/**/*.{ts,tsx}',
@@ -17,10 +18,10 @@ module.exports = {
     transformIgnorePatterns: [
         'node_modules/(?!(react-native|@react-native|react-native-reanimated|react-native-gesture-handler)/)',
     ],
-    moduleNameMapping: {
+    moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
-    testEnvironment: 'jsdom',
+    testEnvironment: 'node',
     globals: {
         'ts-jest': {
             // Inherits tsconfig.json, but overrides jsx: the build keeps

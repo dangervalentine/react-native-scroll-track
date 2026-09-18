@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useScrollTrack, defaultScrollTrackOptions } from '../../src/hooks/useScrollTrack';
+import { scrollEvent } from '../helpers/scrollEvent';
 
 // Mock the animated scroll position hook
 jest.mock('../../src/hooks/useAnimatedScrollPosition', () => ({
@@ -13,7 +14,7 @@ jest.mock('../../src/hooks/useAnimatedScrollPosition', () => ({
 
 // Mock the ScrollProgressTrack component
 jest.mock('../../src/ScrollProgressTrack', () => {
-  return function MockScrollProgressTrack(props) {
+  return function MockScrollProgressTrack(props: Record<string, unknown>) {
     return React.createElement('ScrollProgressTrack', { ...props, testID: 'scroll-progress-track' });
   };
 });
@@ -141,13 +142,7 @@ describe('useScrollTrack', () => {
 
       // Simulate scroll event
       act(() => {
-        result.current.scrollProps.onScroll({
-          nativeEvent: {
-            contentOffset: { y: 100 },
-            layoutMeasurement: { height: 500 },
-            contentSize: { height: 1000 },
-          },
-        });
+        result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
       });
 
       // Should be visible initially
@@ -175,13 +170,7 @@ describe('useScrollTrack', () => {
 
       // Simulate scroll event
       act(() => {
-        result.current.scrollProps.onScroll({
-          nativeEvent: {
-            contentOffset: { y: 100 },
-            layoutMeasurement: { height: 500 },
-            contentSize: { height: 1000 },
-          },
-        });
+        result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
       });
 
       // Should be visible
@@ -209,13 +198,7 @@ describe('useScrollTrack', () => {
 
       // First scroll event
       act(() => {
-        result.current.scrollProps.onScroll({
-          nativeEvent: {
-            contentOffset: { y: 100 },
-            layoutMeasurement: { height: 500 },
-            contentSize: { height: 1000 },
-          },
-        });
+        result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
       });
 
       // Wait 800ms
@@ -225,13 +208,7 @@ describe('useScrollTrack', () => {
 
       // Second scroll event should reset timer
       act(() => {
-        result.current.scrollProps.onScroll({
-          nativeEvent: {
-            contentOffset: { y: 200 },
-            layoutMeasurement: { height: 500 },
-            contentSize: { height: 1000 },
-          },
-        });
+        result.current.scrollProps.onScroll(scrollEvent({ y: 200, containerHeight: 500, contentHeight: 1000 }));
       });
 
       // Wait another 800ms (total 1600ms from first scroll)
@@ -266,15 +243,16 @@ describe('useScrollTrack', () => {
         scrollTo: jest.fn(),
       };
 
-      // Mock ref with getScrollResponder
+      // Mock ref with getScrollResponder. The responder must be a single stable
+      // object, or asserting on getScrollResponder().scrollTo would inspect a
+      // freshly created mock that was never called.
+      const scrollResponder = { scrollTo: jest.fn() };
       const responderRef = {
-        getScrollResponder: jest.fn(() => ({
-          scrollTo: jest.fn(),
-        })),
+        getScrollResponder: jest.fn(() => scrollResponder),
       };
 
       // Test FlatList scrolling
-      result.current.scrollProps.ref.current = flatListRef;
+      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = flatListRef;
       act(() => {
         result.current.scrollProps.onLayout({
           nativeEvent: { layout: { height: 500 } },
@@ -292,7 +270,7 @@ describe('useScrollTrack', () => {
       });
 
       // Test ScrollView scrolling
-      result.current.scrollProps.ref.current = scrollViewRef;
+      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = scrollViewRef;
       act(() => {
         result.current.scrollToPosition(0.25);
       });
@@ -303,13 +281,13 @@ describe('useScrollTrack', () => {
       });
 
       // Test getScrollResponder
-      result.current.scrollProps.ref.current = responderRef;
+      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = responderRef;
       act(() => {
         result.current.scrollToPosition(0.75);
       });
 
       expect(responderRef.getScrollResponder).toHaveBeenCalled();
-      expect(responderRef.getScrollResponder().scrollTo).toHaveBeenCalledWith({
+      expect(scrollResponder.scrollTo).toHaveBeenCalledWith({
         y: 375, // 0.75 * (1000 - 500) = 375
         animated: true,
       });
@@ -318,7 +296,7 @@ describe('useScrollTrack', () => {
     it('should handle null ref gracefully', () => {
       const { result } = renderHook(() => useScrollTrack());
 
-      result.current.scrollProps.ref.current = null;
+      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = null;
 
       expect(() => {
         act(() => {

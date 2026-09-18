@@ -1,0 +1,794 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ScrollProgressTrack Component rendering should render with custom styling 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#00ff00",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 8,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#ff0000",
+          "borderRadius": 4,
+          "elevation": 4,
+          "height": 250,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -4,
+          "shadowColor": "#333333",
+          "shadowOffset": {
+            "height": 3,
+            "width": 1,
+          },
+          "shadowOpacity": 0.5,
+          "shadowRadius": 6,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 8,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;
+
+exports[`ScrollProgressTrack Component rendering should render with default props 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#637777",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 4,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 250,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;
+
+exports[`ScrollProgressTrack Gesture handling should disable gestures when disableGestures is true 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#637777",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 4,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 250,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+</View>
+`;
+
+exports[`ScrollProgressTrack Hit slop should apply custom hit slop 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#637777",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 4,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 250,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;
+
+exports[`ScrollProgressTrack Thumb calculations should handle fixed thumb height 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#637777",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 4,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 100,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;
+
+exports[`ScrollProgressTrack Thumb calculations should limit thumb height to 80% of available height 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#637777",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 4,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 400,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;
+
+exports[`ScrollProgressTrack Track visibility should not render track when trackVisible is false 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 250,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;
+
+exports[`ScrollProgressTrack Track visibility should render track when trackVisible is true 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "bottom": 0,
+        "position": "absolute",
+        "right": 0,
+        "top": 0,
+      },
+      {
+        "zIndex": 1000,
+      },
+    ]
+  }
+  testID="scroll-progress-track"
+>
+  <View
+    collapsable={false}
+    style={
+      {
+        "backgroundColor": "#637777",
+        "height": 500,
+        "opacity": {
+          "addListener": [MockFunction],
+          "interpolate": [MockFunction],
+          "removeListener": [MockFunction],
+          "setValue": [MockFunction],
+        },
+        "position": "absolute",
+        "width": 4,
+      }
+    }
+  />
+  <View
+    collapsable={false}
+    pointerEvents="none"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  >
+    <View
+      collapsable={false}
+      style={
+        {
+          "backgroundColor": "#00CED1",
+          "borderRadius": 0,
+          "elevation": 4,
+          "height": 250,
+          "opacity": {
+            "addListener": [MockFunction],
+            "interpolate": [MockFunction],
+            "removeListener": [MockFunction],
+            "setValue": [MockFunction],
+          },
+          "position": "absolute",
+          "right": -2,
+          "shadowColor": "#000000",
+          "shadowOffset": {
+            "height": 2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.3,
+          "shadowRadius": 4,
+          "transform": [
+            {
+              "translateY": {
+                "addListener": [MockFunction],
+                "removeListener": [MockFunction],
+                "setValue": [MockFunction],
+              },
+            },
+          ],
+          "width": 4,
+        }
+      }
+    />
+  </View>
+  <View
+    collapsable={false}
+    pointerEvents="auto"
+    style={
+      {
+        "alignItems": "center",
+        "height": 500,
+        "justifyContent": "flex-start",
+        "position": "absolute",
+        "right": 0,
+        "width": 22,
+      }
+    }
+  />
+</View>
+`;

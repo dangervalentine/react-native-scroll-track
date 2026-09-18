@@ -142,15 +142,13 @@ const { scrollProps, ScrollTrack } = useScrollTrack();
 | `alwaysVisible`            | `boolean`  | `false`     | Prevents auto-hide behavior |
 | `disableGestures`          | `boolean`  | `false`     | Disables tap/drag on scrollbar |
 | `fadeOutDelay`             | `number`   | `1000`      | Delay before fading track (ms) |
-| `hitSlop`                  | `number`   | `36`        | Increases the touchable area of the thumb|
+| `hitSlop`                  | `number`   | `22`        | Increases the touchable area of the thumb|
 | `inverted`                 | `boolean`  | `false`     | Reverses track direction (chat-style) |
 | `minScrollDistanceToShow`  | `number`   | `20`        | Min scrollable height before track appears |
 | `scrollThrottle`           | `number`   | `1`         | Throttle for scroll events |
 | `styling`                  | `object`   | `{}`        | Styling for track and thumb |
 | `onPressStart`             | `function` |             | Callback when interaction starts |
 | `onPressEnd`               | `function` |             | Callback when interaction ends |
-| `onDragStart`	             | `function` |             | Callback when thumb drag starts |
-| `onDragEnd`	             | `function` |             | Callback when thumb drag ends |
 | `externalRef`	             | `ref`      |             | Supply your own list ref (FlatList, ScrollView, FlashList) |
 
 #### `styling` Options

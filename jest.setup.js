@@ -114,6 +114,14 @@ jest.mock('react-native-reanimated', () => {
         return ref.current;
     };
 
+    // Likewise useAnimatedRef: the stock mock returns a fresh { current: null }
+    // each render, which would silently discard whatever was attached to it.
+    Reanimated.useAnimatedRef = () => {
+        const ref = useRef(null);
+        if (ref.current === null) ref.current = { current: null };
+        return ref.current;
+    };
+
     return Reanimated;
 });
 

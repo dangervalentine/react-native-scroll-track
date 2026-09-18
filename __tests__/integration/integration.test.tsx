@@ -1,11 +1,21 @@
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { View, FlatList, ScrollView, Text } from 'react-native';
-import { useScrollTrack } from '../../src/hooks/useScrollTrack';
-import { State } from 'react-native-gesture-handler';
+import { useScrollTrack, type ScrollTrackOptions } from '../../src/hooks/useScrollTrack';
+
+interface TestItem {
+    id: number;
+    text: string;
+}
 
 // Test component that uses the scroll track
-const TestFlatListComponent = ({ options, data }) => {
+const TestFlatListComponent = ({
+    options,
+    data,
+}: {
+    options?: ScrollTrackOptions;
+    data: TestItem[];
+}) => {
     const { scrollProps, ScrollTrack } = useScrollTrack(options);
 
     return (
@@ -26,7 +36,13 @@ const TestFlatListComponent = ({ options, data }) => {
     );
 };
 
-const TestScrollViewComponent = ({ options, contentHeight = 2000 }) => {
+const TestScrollViewComponent = ({
+    options,
+    contentHeight = 2000,
+}: {
+    options?: ScrollTrackOptions;
+    contentHeight?: number;
+}) => {
     const { scrollProps, ScrollTrack } = useScrollTrack(options);
 
     return (
@@ -44,8 +60,27 @@ const TestScrollViewComponent = ({ options, contentHeight = 2000 }) => {
     );
 };
 
+/**
+ * Whether the track's gesture overlay is currently accepting touches. The
+ * overlay is the childless node declaring pointerEvents; the visuals layer
+ * declares it too, but holds the thumb.
+ */
+const overlayAcceptsTouches = (track: any): boolean => {
+    if (!track) return false;
+    let accepts = false;
+    const walk = (node: any) => {
+        if (!node || typeof node !== 'object') return;
+        const children = node.children ?? [];
+        const pe = node.props?.pointerEvents;
+        if (pe && children.length === 0 && pe !== 'none') accepts = true;
+        children.forEach(walk);
+    };
+    walk(track);
+    return accepts;
+};
+
 describe('Integration Tests', () => {
-    const generateTestData = (count) =>
+    const generateTestData = (count: number): TestItem[] =>
         Array.from({ length: count }, (_, i) => ({ id: i, text: `Item ${i}` }));
 
     beforeEach(() => {
@@ -431,15 +466,16 @@ describe('Integration Tests', () => {
                 fireEvent(flatlist, 'contentSizeChange', 300, 550); // Only 50px difference
             });
 
-            // Scroll track should not be visible (50 < 100)
-            expect(queryByTestId('scroll-progress-track')).toBeNull();
+            // Below the threshold the track is inert: it may be mounted, but it
+            // neither shows nor accepts touches on the right edge.
+            expect(overlayAcceptsTouches(queryByTestId('scroll-progress-track'))).toBe(false);
 
             // Now make it more scrollable
             act(() => {
                 fireEvent(flatlist, 'contentSizeChange', 300, 650); // 150px difference
             });
 
-            // Now scroll track should be visible (150 > 100)
+            // Past the threshold the track becomes usable (150 > 100)
             expect(queryByTestId('scroll-progress-track')).not.toBeNull();
         });
     });

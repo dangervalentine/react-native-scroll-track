@@ -5,10 +5,11 @@ import { Animated } from 'react-native';
 import { useScrollTrack } from '../../src/hooks/useScrollTrack';
 import ScrollProgressTrack from '../../src/ScrollProgressTrack';
 import { State } from 'react-native-gesture-handler';
+import { scrollEvent } from '../helpers/scrollEvent';
 
 // Mock the ScrollProgressTrack component and animated scroll position
 jest.mock('../../src/ScrollProgressTrack', () => {
-    return function MockScrollProgressTrack(props) {
+    return function MockScrollProgressTrack(props: Record<string, unknown>) {
         return React.createElement('ScrollProgressTrack', {
             ...props,
             testID: 'scroll-progress-track'
@@ -133,7 +134,7 @@ describe('Edge Cases and Error Handling', () => {
 
             expect(() => {
                 act(() => {
-                    result.current.scrollProps.onScroll({});
+                    result.current.scrollProps.onScroll({} as any);
                 });
             }).not.toThrow();
         });
@@ -152,10 +153,12 @@ describe('Edge Cases and Error Handling', () => {
                 act(() => {
                     result.current.scrollProps.onScroll({
                         nativeEvent: {
-                            layoutMeasurement: { height: 500 },
-                            contentSize: { height: 1000 },
+                            layoutMeasurement: { width: 300, height: 500 },
+                            contentSize: { width: 300, height: 1000 },
+                            contentInset: { top: 0, left: 0, bottom: 0, right: 0 },
+                            zoomScale: 1,
                         },
-                    });
+                    } as any);
                 });
             }).not.toThrow();
         });
@@ -178,7 +181,7 @@ describe('Edge Cases and Error Handling', () => {
                             layoutMeasurement: null,
                             contentSize: null,
                         },
-                    });
+                    } as any);
                 });
             }).not.toThrow();
         });
@@ -201,7 +204,7 @@ describe('Edge Cases and Error Handling', () => {
                             layoutMeasurement: undefined,
                             contentSize: undefined,
                         },
-                    });
+                    } as any);
                 });
             }).not.toThrow();
         });
@@ -218,7 +221,7 @@ describe('Edge Cases and Error Handling', () => {
                 result.current.scrollProps.onContentSizeChange(0, 1000);
             });
 
-            result.current.scrollProps.ref.current = null;
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = null;
 
             expect(() => {
                 act(() => {
@@ -237,7 +240,7 @@ describe('Edge Cases and Error Handling', () => {
                 result.current.scrollProps.onContentSizeChange(0, 1000);
             });
 
-            result.current.scrollProps.ref.current = {};
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = {};
 
             expect(() => {
                 act(() => {
@@ -259,7 +262,7 @@ describe('Edge Cases and Error Handling', () => {
             const mockScrollRef = {
                 scrollToOffset: jest.fn(),
             };
-            result.current.scrollProps.ref.current = mockScrollRef;
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = mockScrollRef;
 
             // Test position > 1
             act(() => {
@@ -295,7 +298,7 @@ describe('Edge Cases and Error Handling', () => {
             const mockScrollRef = {
                 scrollToOffset: jest.fn(),
             };
-            result.current.scrollProps.ref.current = mockScrollRef;
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = mockScrollRef;
 
             expect(() => {
                 act(() => {
@@ -317,7 +320,7 @@ describe('Edge Cases and Error Handling', () => {
             const mockScrollRef = {
                 scrollToOffset: jest.fn(),
             };
-            result.current.scrollProps.ref.current = mockScrollRef;
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = mockScrollRef;
 
             expect(() => {
                 act(() => {
@@ -329,9 +332,10 @@ describe('Edge Cases and Error Handling', () => {
 
     describe('ScrollProgressTrack edge cases', () => {
         // Reset the mock for direct component tests
-        beforeEach(() => {
-            jest.doMock('../../src/ScrollProgressTrack');
-        });
+        // The module-level mock stands in for the track everywhere else in this
+        // file; these tests assert the real component's own rendering.
+        const RealScrollProgressTrack: typeof ScrollProgressTrack =
+            jest.requireActual('../../src/ScrollProgressTrack').default;
 
         it('should handle missing onScrollToPosition callback', () => {
             const defaultProps = {
@@ -342,7 +346,7 @@ describe('Edge Cases and Error Handling', () => {
             };
 
             expect(() => {
-                render(<ScrollProgressTrack {...defaultProps} />);
+                render(<ScrollProgressTrack {...(defaultProps as any)} />);
             }).not.toThrow();
         });
 
@@ -391,7 +395,7 @@ describe('Edge Cases and Error Handling', () => {
                 animatedScrollPosition: new Animated.Value(0),
             };
 
-            const { toJSON } = render(<ScrollProgressTrack {...defaultProps} />);
+            const { toJSON } = render(<RealScrollProgressTrack {...defaultProps} />);
             expect(toJSON()).toBeNull();
         });
     });
@@ -451,7 +455,7 @@ describe('Edge Cases and Error Handling', () => {
             };
 
             expect(() => {
-                renderHook(() => useScrollTrack({ styling: invalidStyling }));
+                renderHook(() => useScrollTrack({ styling: invalidStyling as any }));
             }).not.toThrow();
         });
 
@@ -466,7 +470,7 @@ describe('Edge Cases and Error Handling', () => {
             };
 
             expect(() => {
-                renderHook(() => useScrollTrack({ styling: invalidStyling }));
+                renderHook(() => useScrollTrack({ styling: invalidStyling as any }));
             }).not.toThrow();
         });
     });
@@ -523,13 +527,7 @@ describe('Edge Cases and Error Handling', () => {
             // Many simultaneous scroll events
             act(() => {
                 for (let i = 0; i < 1000; i++) {
-                    result.current.scrollProps.onScroll({
-                        nativeEvent: {
-                            contentOffset: { y: i },
-                            layoutMeasurement: { height: 500 },
-                            contentSize: { height: 1000 },
-                        },
-                    });
+                    result.current.scrollProps.onScroll(scrollEvent({ y: i, containerHeight: 500, contentHeight: 1000 }));
                 }
             });
 
@@ -550,13 +548,7 @@ describe('Edge Cases and Error Handling', () => {
 
             // Simultaneous layout and scroll events
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
                 result.current.scrollProps.onLayout({
                     nativeEvent: { layout: { height: 600 } },
                 });
@@ -579,17 +571,11 @@ describe('Edge Cases and Error Handling', () => {
             const mockScrollRef = {
                 scrollToOffset: jest.fn(),
             };
-            result.current.scrollProps.ref.current = mockScrollRef;
+            (result.current.scrollProps.ref as React.MutableRefObject<any>).current = mockScrollRef;
 
             // Simultaneous programmatic scroll and user scroll
             act(() => {
-                result.current.scrollProps.onScroll({
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 1000 },
-                    },
-                });
+                result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
                 result.current.scrollToPosition(0.5);
             });
 
@@ -617,7 +603,7 @@ describe('Edge Cases and Error Handling', () => {
             ];
 
             testRefs.forEach((ref, index) => {
-                result.current.scrollProps.ref.current = ref;
+                (result.current.scrollProps.ref as React.MutableRefObject<any>).current = ref;
 
                 expect(() => {
                     act(() => {
@@ -637,7 +623,7 @@ describe('Edge Cases and Error Handling', () => {
 
         it('should handle null options object', () => {
             expect(() => {
-                renderHook(() => useScrollTrack(null));
+                renderHook(() => useScrollTrack(null as any));
             }).not.toThrow();
         });
 
