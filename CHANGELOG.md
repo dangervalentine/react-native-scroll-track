@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.0.1
+
+Documentation only. No runtime changes — `lib/` is byte-identical to 2.0.0.
+
+### Changed
+
+- **README has artwork.** Added a title card, a package logo, and a three-up
+  table of the scroll / tap / drag interactions. The npm page previously
+  carried no images at all.
+- **Interaction GIFs re-recorded.** The originals predated the demo app's dark
+  theme and were encoded at 720x1620 while being displayed at 200px. Re-shot
+  against the current theme and encoded at display size: 48 MB down to 4.9 MB
+  across the three.
+
+Images are linked from `raw.githubusercontent.com` at `main` rather than
+bundled, since `files` ships only `lib`, `README.md`, `CHANGELOG.md` and
+`LICENSE`. Replacing the artwork on `main` therefore updates the npm page
+without a release.
+
 ## 2.0.0
 
 ### Removed (breaking)
