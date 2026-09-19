@@ -1,12 +1,44 @@
-# react-native-scroll-track
+<p align="center">
+  <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/icon.png" width="80" alt="react-native-scroll-track" />
+</p>
 
-✨ A customizable, interactive scroll indicator for React Native. Tap or drag to scroll, with animated thumb and auto-hide behavior.
+<h1 align="center">react-native-scroll-track</h1>
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
-[![npm version](https://badge.fury.io/js/react-native-scroll-track.svg)](https://badge.fury.io/js/react-native-scroll-track)
+<p align="center">
+  <strong>A customizable, interactive scroll indicator for React Native. Tap or drag the track to jump, with an animated thumb and auto-hide behavior.</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/react-native-scroll-track">npm</a>
+  &nbsp;·&nbsp;
+  <a href="https://snack.expo.dev/@dangervalentine/scrolltrackdemo">Live Demo</a>
+  &nbsp;·&nbsp;
+  <a href="./CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <a href="https://snack.expo.dev/@dangervalentine/scrolltrackdemo">
+    <img
+      src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/key-art.png"
+      width="720"
+      alt="react-native-scroll-track title art: the wordmark above a list tile with a mint scroll thumb on its track, a tap ripple further down the track with a dashed line showing the jump, and a faint compressed column beside it bracketing where the visible rows sit in the whole list."
+    />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/react-native-scroll-track">
+    <img src="https://img.shields.io/npm/v/react-native-scroll-track?color=7FDBCA" alt="npm version" />
+  </a>
+  <img src="https://img.shields.io/npm/dm/react-native-scroll-track?color=82AAFF" alt="npm downloads" />
+  <img src="https://img.shields.io/badge/react_native-0.60+-61DAFB?logo=react&logoColor=white" alt="React Native 0.60+" />
+  <img src="https://img.shields.io/badge/typescript-ready-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/license-MIT-C3E88D" alt="MIT License" />
+</p>
 
 ---
+
+The track is a scale model of your list: the thumb is sized to how much of the content fits on screen, and it moves as you scroll. Drag it to move through the content directly, or tap anywhere on the track to jump straight there.
 
 ## 🚀 Features
 
@@ -26,6 +58,26 @@
 
 Try out the scroll track interactively on **Expo Snack**:
 👉 [Open in Snack](https://snack.expo.dev/@dangervalentine/scrolltrackdemo)
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/scroll.gif" alt="Normal scrolling" width="200" />
+      <br /><strong>Scroll</strong>
+      <br />The thumb syncs with native scrolling to reflect your position.
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/tap.gif" alt="Tap to jump" width="200" />
+      <br /><strong>Tap</strong>
+      <br />Tap anywhere on the track to jump to that part of the content.
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/dangervalentine/react-native-scroll-track/main/media/drag.gif" alt="Drag to scroll" width="200" />
+      <br /><strong>Drag</strong>
+      <br />Drag the thumb to scroll smoothly through the list.
+    </td>
+  </tr>
+</table>
 
 ---
 
