@@ -11,7 +11,9 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/react-native-scroll-track">npm</a>
   &nbsp;·&nbsp;
-  <a href="https://snack.expo.dev/@dangervalentine/scrolltrackdemo">Live Demo</a>
+  <a href="https://snack.expo.dev/@dangervalentine/scrolltrackdemo">Try in Snack</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dangervalentine/ScrollTrackDemo">Demo app</a>
   &nbsp;·&nbsp;
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
@@ -56,8 +58,12 @@ The track is a scale model of your list: the thumb is sized to how much of the c
 
 ## 🧪 Live Demo
 
-Try out the scroll track interactively on **Expo Snack**:
-👉 [Open in Snack](https://snack.expo.dev/@dangervalentine/scrolltrackdemo)
+Two ways to try it, whichever suits you:
+
+- 🌐 **[Open in Expo Snack](https://snack.expo.dev/@dangervalentine/scrolltrackdemo)** — runs in the browser, nothing to
+  install. Needs an Expo Go matching the Snack's SDK if you open it on a device.
+- 📱 **[ScrollTrackDemo](https://github.com/dangervalentine/ScrollTrackDemo)** — the full demo app this package is
+  developed against, tracking the current Expo SDK. Clone it, `npm install`, `npm start`.
 
 <table>
   <tr>
