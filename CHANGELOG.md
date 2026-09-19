@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.0.2
+
+Documentation only. No runtime changes — `lib/` is byte-identical to 2.0.1.
+
+### Changed
+
+- **The demo app is linked alongside the Snack.** Expo Snack was the only
+  advertised way to try the package. [ScrollTrackDemo][demo] now sits beside it
+  as an equal option, in both the header links and the Live Demo section.
+
+Each option notes what it is good for: the Snack runs in a browser with nothing
+to install but needs an Expo Go matching its SDK on a device, while the demo app
+tracks the current Expo SDK and runs natively.
+
+[demo]: https://github.com/dangervalentine/ScrollTrackDemo
+
 ## 2.0.1
 
 Documentation only. No runtime changes — `lib/` is byte-identical to 2.0.0.
