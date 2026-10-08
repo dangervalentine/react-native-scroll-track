@@ -1,5 +1,6 @@
 module.exports = {
-    preset: 'react-native',
+    preset: '@react-native/jest-preset',
+    resolver: 'react-native-worklets/jest/resolver',
     setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
     // only *.test.* / *.spec.* are suites; helpers and .d.ts under __tests__ are not
@@ -12,30 +13,11 @@ module.exports = {
     ],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'html'],
-    transform: {
-        '^.+\\.(ts|tsx)$': 'ts-jest',
-    },
     transformIgnorePatterns: [
-        'node_modules/(?!(react-native|@react-native|react-native-reanimated|react-native-gesture-handler)/)',
+        'node_modules/(?!(react-native|@react-native|react-native-reanimated|react-native-worklets|react-native-gesture-handler)/)',
     ],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
     testEnvironment: 'node',
-    globals: {
-        'ts-jest': {
-            // Inherits tsconfig.json, but overrides jsx: the build keeps
-            // "react-native" so Metro/Babel handles JSX, while ts-jest has no
-            // Babel step after it and must emit plain JS itself. "react-jsx"
-            // (automatic runtime) matches Metro and needs no React in scope.
-            tsconfig: {
-                jsx: 'react-jsx',
-            },
-            // Dependencies are transformed (see transformIgnorePatterns) but are
-            // not ours to type-check; only report diagnostics for our own code.
-            diagnostics: {
-                exclude: ['**/node_modules/**'],
-            },
-        },
-    },
 };

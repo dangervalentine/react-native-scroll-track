@@ -4,6 +4,87 @@ All notable changes to this project are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.0 (unreleased)
+
+The track now runs on Reanimated shared values. The thumb is sized, positioned
+and faded on the UI thread, and scrolling no longer re-renders the component
+that calls the hook.
+
+### Changed (breaking)
+
+- **Requirements.** React 19, React Native 0.78 or newer on the New
+  Architecture, Reanimated 4 with `react-native-worklets`, and Gesture Handler
+  2.24 or newer. The Babel plugin to list last is now
+  `react-native-worklets/plugin`. Older setups stay on 2.x.
+- **`useScrollTrack` no longer returns `isVisible`.** Whether the track is
+  showing lived in React state, which re-rendered the host twice for every
+  burst of scrolling. It is a shared value inside the track now and does not
+  pass through React.
+- **`useAnimatedScrollPosition` is removed.** It wrapped a React Native
+  `Animated.Value`. The hook returns `scrollY`, a shared value, in its place.
+- **`ScrollProgressTrack` takes shared values.** `scrollY`, `containerHeight`,
+  `contentHeight` and the optional `containerOffsetY` replace
+  `animatedScrollPosition`, `scrollPosition`, `visible`, `onDragStart`,
+  `onDragEnd` and the numeric heights. `onScrollToPosition` receives
+  `(position, animated)`, and `fadeOutDelay` is a prop of the track.
+- **`scrollThrottle` defaults to 16**, down from one event per millisecond.
+- **`scrollProps.ref` may be a function.** It is when `externalRef` is a
+  callback ref. Read the node from the returned `scrollRef`, which is always a
+  ref object.
+- **The track follows its scrollable.** It was pinned to the top and bottom of
+  the parent view, so a header in the same parent pushed the track up behind
+  it. It now starts at the scrollable's own top and is exactly as tall.
+- **The track and thumb are drawn at full width.** They were centred on the
+  edge of the parent view, so half of `trackWidth` hung off the screen: the
+  default of 4 showed as 2 points. They now sit flush with the edge, fully on
+  screen. If you tuned `trackWidth` by eye, halve it to keep the same look.
+- **A small first scroll no longer shows the track.** The offset has to move
+  12 points before the track fades in.
+
+### Added
+
+- **Tracked components.** `TrackedScrollView`, `TrackedFlatList` and
+  `TrackedSectionList` take the props of the component they replace, plus
+  `scrollTrack` for the options, and render the track beside it. State the
+  track needs stays inside the component, away from your screen.
+- **`disableTap`.** Turns off tap-to-jump and keeps the drag. `disableGestures`
+  still turns off both.
+- **`touchWidth`.** The width of the strip along the edge that takes touches,
+  22 points on iOS and 18 on Android unless set. It is never narrower than the
+  track, and `hitSlop` still extends around it.
+- **`scrollY` option.** Pass a shared value you already keep up to date and
+  the track reads it, adding no scroll handling of its own.
+- **`scrollY` returned by the hook**, the scroll offset as a shared value.
+- **Handler pass-through.** `useScrollTrack` takes `onScroll`, `onLayout` and
+  `onContentSizeChange`. Spreading `scrollProps` replaces those three props on
+  the scrollable, so there was no way to keep your own short of composing them
+  by hand. Each is called after the track has read the event, and may be an
+  inline function without giving the scrollable a new prop every render.
+- **Callback refs for `externalRef`.** It accepted only a ref object. A
+  callback ref now receives the node as well, including a cleanup returned
+  from it.
+- **`scrollToPosition(position, animated)`.** The second argument defaults to
+  `true`. The position is clamped to 0 to 1, and `NaN` is ignored.
+
+### Fixed
+
+- **`externalRef` no longer changes the order of hooks.** The hook's own ref
+  was created only when `externalRef` was missing, so a ref that was undefined
+  on one render and set on the next broke the rules of hooks.
+- **`onPressStart` and `onPressEnd` fire once per touch.** The tap and the pan
+  each called them, so a single touch reported two presses.
+- **Content that changes size no longer re-renders the host** unless it
+  changes whether there is anything to scroll.
+
+### Internal
+
+- The tests run Reanimated for real under Jest in place of a mock, so the
+  fade timings and the thumb's position are asserted, not assumed. Sources go
+  through Babel with the worklets plugin; `tsc` type-checks the tests.
+- Development moved to React 19.2, React Native 0.86, Reanimated 4.5 and
+  `@testing-library/react-native` 13. `@testing-library/react-hooks`,
+  `@types/react-native` and `ts-jest` are gone.
+
 ## 2.0.2
 
 Documentation only. No runtime changes — `lib/` is byte-identical to 2.0.1.

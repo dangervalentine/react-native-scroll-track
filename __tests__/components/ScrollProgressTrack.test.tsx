@@ -1,362 +1,225 @@
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Animated } from 'react-native';
-import ScrollProgressTrack from '../../src/ScrollProgressTrack';
-import { Gesture } from 'react-native-gesture-handler';
-
-const gestureRegistry = Gesture as unknown as {
-    __created: Array<{
-        kind: string;
-        handlers: Record<string, (event?: any) => void>;
-        config: Record<string, any>;
-    }>;
-    __reset: () => void;
-};
-
-const ofKind = (kind: string) => {
-    const all = gestureRegistry.__created.filter((g) => g.kind === kind);
-    return all[all.length - 1];
-};
-const lastPan = () => ofKind('pan');
-const lastTap = () => ofKind('tap');
+import { advance, gestureRegistry, makeGeometry, renderTrack } from '../helpers/track';
 
 describe('ScrollProgressTrack', () => {
-  const defaultProps = {
-    containerHeight: 500,
-    contentHeight: 1000,
-    onScrollToPosition: jest.fn(),
-    scrollPosition: 0,
-    animatedScrollPosition: new Animated.Value(0),
-  };
-
-  beforeAll(() => jest.useRealTimers());
-  afterAll(() => jest.useFakeTimers());
-
-  beforeEach(() => {
-    gestureRegistry.__reset();
-    jest.clearAllMocks();
-  });
-
-  describe('Component rendering', () => {
-    it('should render with default props', () => {
-      const { toJSON } = render(<ScrollProgressTrack {...defaultProps} />);
-      expect(toJSON()).toMatchSnapshot();
+    beforeEach(() => {
+        gestureRegistry.__reset();
     });
 
-    it('should not render when content is not scrollable', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          containerHeight={500}
-          contentHeight={400}
-        />
-      );
-      expect(toJSON()).toBeNull();
+    describe('layout', () => {
+        it('spans the viewport of the scrollable', () => {
+            const view = renderTrack({ geometry: makeGeometry({ container: 500, offset: 64 }) });
+
+            expect(view.container()).toMatchObject({ position: 'absolute', right: 0, top: 64, height: 500 });
+        });
+
+        it('sits at the top of its parent when given no offset', () => {
+            const { containerOffsetY: _unused, ...geometry } = makeGeometry();
+            const view = renderTrack({ geometry: geometry as any });
+
+            expect(view.container().top).toBe(0);
+        });
+
+        it('follows a viewport that changes height', () => {
+            const view = renderTrack();
+
+            view.geometry.containerHeight.value = 320;
+            advance(20);
+
+            expect(view.container().height).toBe(320);
+        });
     });
 
-    it('should not render when container is too small', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          containerHeight={50}
-          contentHeight={1000}
-        />
-      );
-      expect(toJSON()).toBeNull();
+    describe('styling', () => {
+        it('applies the defaults', () => {
+            const view = renderTrack({ alwaysVisible: true });
+
+            expect(view.container().zIndex).toBe(1000);
+            expect(view.track()).toMatchObject({ width: 4, backgroundColor: '#637777', opacity: 0.3 });
+            expect(view.thumb()).toMatchObject({
+                width: 4,
+                backgroundColor: '#00CED1',
+                borderRadius: 0,
+                opacity: 0.8,
+                shadowColor: '#000000',
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+            });
+        });
+
+        it('applies custom styling', () => {
+            const view = renderTrack({
+                alwaysVisible: true,
+                styling: {
+                    trackWidth: 8,
+                    thumbColor: '#ff0000',
+                    trackColor: '#00ff00',
+                    trackOpacity: 0.5,
+                    thumbOpacity: 1,
+                    thumbBorderRadius: 4,
+                    zIndex: 5,
+                    thumbShadow: { color: '#111111', opacity: 0.6, radius: 2, offset: { width: 1, height: 1 } },
+                },
+            });
+
+            expect(view.container().zIndex).toBe(5);
+            expect(view.track()).toMatchObject({ width: 8, backgroundColor: '#00ff00', opacity: 0.5 });
+            expect(view.thumb()).toMatchObject({
+                width: 8,
+                backgroundColor: '#ff0000',
+                borderRadius: 4,
+                opacity: 1,
+                shadowColor: '#111111',
+                shadowOpacity: 0.6,
+                shadowRadius: 2,
+            });
+        });
+
+        it('draws the track and the thumb at full width, flush with the edge', () => {
+            const view = renderTrack({ styling: { trackWidth: 6 } });
+
+            expect(view.track()).toMatchObject({ position: 'absolute', right: 0, width: 6 });
+            expect(view.thumb()).toMatchObject({ position: 'absolute', right: 0, width: 6 });
+            // Wide enough to hold them: nothing hangs over the edge.
+            expect(view.container().width).toBeGreaterThanOrEqual(6);
+        });
+
+        it('leaves the track background out when trackVisible is false', () => {
+            const view = renderTrack({ styling: { trackVisible: false } });
+
+            expect(view.queryByTestId('scroll-progress-track-track')).toBeNull();
+            expect(view.getByTestId('scroll-progress-track-thumb')).toBeTruthy();
+        });
+
+        it('uses a custom testID', () => {
+            const view = renderTrack({ testID: 'my-track' });
+
+            expect(view.getByTestId('my-track')).toBeTruthy();
+            expect(view.getByTestId('my-track-thumb')).toBeTruthy();
+        });
     });
 
-    it('should render with custom styling', () => {
-      const customStyling = {
-        thumbColor: '#ff0000',
-        trackColor: '#00ff00',
-        trackWidth: 8,
-        thumbBorderRadius: 4,
-        thumbShadow: {
-          color: '#333333',
-          opacity: 0.5,
-          radius: 6,
-          offset: { width: 1, height: 3 },
-        },
-      };
+    describe('thumb position', () => {
+        it('starts at the top and ends at the bottom of the track', () => {
+            // 500 of 1000 visible: a 250pt thumb with 250pt of travel.
+            const view = renderTrack();
+            expect(view.thumb()).toMatchObject({ height: 250, transform: [{ translateY: 0 }] });
 
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          styling={customStyling}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-  });
+            view.scrollTo(250);
+            expect(view.thumb().transform).toEqual([{ translateY: 125 }]);
 
-  describe('Thumb calculations', () => {
-    it('should calculate thumb height correctly', () => {
-      // containerHeight / contentHeight = 500 / 1000 = 0.5
-      // availableHeight = 500
-      // expectedThumbHeight = 500 * 0.5 = 250
-      const { getByTestId } = render(
-        <ScrollProgressTrack {...defaultProps} />
-      );
+            view.scrollTo(500);
+            expect(view.thumb().transform).toEqual([{ translateY: 250 }]);
+        });
 
-      // The thumb height should be calculated as container/content ratio
-      // We can't directly test the height calculation, but we can verify rendering
-      expect(getByTestId).toBeDefined();
-    });
+        it('clamps an overscroll at either end', () => {
+            const view = renderTrack();
 
-    it('should limit thumb height to 80% of available height', () => {
-      // Very small content should result in large thumb, but capped at 80%
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          containerHeight={500}
-          contentHeight={550} // Small difference
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
+            view.scrollTo(-80);
+            expect(view.thumb().transform).toEqual([{ translateY: 0 }]);
+
+            view.scrollTo(900);
+            expect(view.thumb().transform).toEqual([{ translateY: 250 }]);
+        });
+
+        it('runs the other way when inverted', () => {
+            const view = renderTrack({ inverted: true });
+            expect(view.thumb().transform).toEqual([{ translateY: 250 }]);
+
+            view.scrollTo(500);
+            expect(view.thumb().transform).toEqual([{ translateY: 0 }]);
+        });
+
+        it('resizes the thumb when the content grows', () => {
+            const view = renderTrack();
+
+            view.geometry.contentHeight.value = 2000;
+            advance(20);
+
+            expect(view.thumb().height).toBe(125);
+        });
     });
 
-    it('should handle fixed thumb height', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          styling={{ thumbHeight: 100 }}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
+    describe('showing and hiding', () => {
+        it('starts hidden', () => {
+            const view = renderTrack();
+
+            expect(view.thumb().opacity).toBe(0);
+            expect(view.track().opacity).toBe(0);
+        });
+
+        it('shows on scroll and fades out after fadeOutDelay', () => {
+            const view = renderTrack({ fadeOutDelay: 1000 });
+
+            view.scrollTo(100);
+            advance(200);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+            expect(view.track().opacity).toBeCloseTo(0.3);
+
+            advance(700);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            advance(1000);
+            expect(view.thumb().opacity).toBe(0);
+            expect(view.track().opacity).toBe(0);
+        });
+
+        it('stays shown while scrolling continues', () => {
+            const view = renderTrack({ fadeOutDelay: 1000 });
+
+            view.scrollTo(100);
+            advance(800);
+            view.scrollTo(200);
+            advance(800);
+            view.scrollTo(300);
+            advance(800);
+
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            advance(1500);
+            expect(view.thumb().opacity).toBe(0);
+        });
+
+        it('honours a custom fadeOutDelay', () => {
+            const view = renderTrack({ fadeOutDelay: 3000 });
+
+            view.scrollTo(100);
+            advance(2500);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            advance(1500);
+            expect(view.thumb().opacity).toBe(0);
+        });
+
+        it('ignores a scroll too small to matter', () => {
+            const view = renderTrack();
+
+            view.scrollTo(5);
+            advance(200);
+
+            expect(view.thumb().opacity).toBe(0);
+        });
+
+        it('never hides when alwaysVisible is set', () => {
+            const view = renderTrack({ alwaysVisible: true });
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            view.scrollTo(100);
+            advance(10000);
+
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+        });
+
+        it('follows alwaysVisible when it changes', () => {
+            const view = renderTrack();
+            expect(view.thumb().opacity).toBe(0);
+
+            view.update({ alwaysVisible: true });
+            advance(20);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            view.update({ alwaysVisible: false });
+            advance(20);
+            expect(view.thumb().opacity).toBe(0);
+        });
     });
-  });
-
-  describe('Gesture handling', () => {
-    it('should handle tap gestures', () => {
-      const onScrollToPosition = jest.fn();
-      render(
-        <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-      );
-
-      // Tap at the middle of the 500px track
-      lastTap().handlers.onEnd({ y: 250 });
-
-      expect(onScrollToPosition).toHaveBeenCalledWith(0.5);
-    });
-
-    it('should handle inverted tap gestures', () => {
-      const onScrollToPosition = jest.fn();
-      render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          onScrollToPosition={onScrollToPosition}
-          inverted={true}
-        />
-      );
-
-      lastTap().handlers.onEnd({ y: 250 });
-
-      expect(onScrollToPosition).toHaveBeenCalledWith(0.5); // 1 - 0.5 = 0.5
-    });
-
-    it('should handle drag gestures', () => {
-      const onScrollToPosition = jest.fn();
-      const onDragStart = jest.fn();
-      const onDragEnd = jest.fn();
-      render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          onScrollToPosition={onScrollToPosition}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-        />
-      );
-
-      const { handlers } = lastPan();
-
-      handlers.onBegin({ y: 100 });
-      expect(onDragStart).toHaveBeenCalled();
-
-      handlers.onUpdate({ y: 100 });
-      expect(onScrollToPosition).toHaveBeenCalledWith(0.2); // 100 / 500
-
-      handlers.onUpdate({ y: 200 });
-      expect(onScrollToPosition).toHaveBeenCalledWith(0.4); // 200 / 500
-
-      handlers.onFinalize();
-      expect(onDragEnd).toHaveBeenCalled();
-    });
-
-    it('should handle cancelled drag gestures', () => {
-      const onDragEnd = jest.fn();
-      render(
-        <ScrollProgressTrack {...defaultProps} onScrollToPosition={jest.fn()} onDragEnd={onDragEnd} />
-      );
-
-      const { handlers } = lastPan();
-      handlers.onBegin({ y: 100 });
-      // onFinalize covers END, FAIL and CANCEL alike
-      handlers.onFinalize();
-
-      expect(onDragEnd).toHaveBeenCalled();
-    });
-
-    it('should disable gestures when disableGestures is true', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          onScrollToPosition={jest.fn()}
-          disableGestures={true}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-  });
-
-  describe('Callbacks', () => {
-    it('should call onPressStart and onPressEnd callbacks', () => {
-      const onPressStart = jest.fn();
-      const onPressEnd = jest.fn();
-      render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          onScrollToPosition={jest.fn()}
-          onPressStart={onPressStart}
-          onPressEnd={onPressEnd}
-        />
-      );
-
-      const { handlers } = lastPan();
-
-      handlers.onBegin({ y: 100 });
-      expect(onPressStart).toHaveBeenCalled();
-
-      handlers.onFinalize();
-      expect(onPressEnd).toHaveBeenCalled();
-    });
-
-    it('should call onPressEnd on cancelled state', () => {
-      const onPressEnd = jest.fn();
-      render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          onScrollToPosition={jest.fn()}
-          onPressEnd={onPressEnd}
-        />
-      );
-
-      const { handlers } = lastPan();
-      handlers.onBegin({ y: 100 });
-      handlers.onFinalize();
-
-      expect(onPressEnd).toHaveBeenCalled();
-    });
-  });
-  describe('Animation behavior', () => {
-    it('should update opacity based on visibility', () => {
-      const { rerender } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          visible={true}
-        />
-      );
-
-      // Initial render with visible=true
-      expect(Animated.parallel).toHaveBeenCalled();
-
-      // Re-render with visible=false
-      rerender(
-        <ScrollProgressTrack
-          {...defaultProps}
-          visible={false}
-        />
-      );
-
-      expect(Animated.parallel).toHaveBeenCalledTimes(2);
-    });
-
-    it('should handle alwaysVisible prop', () => {
-      const { rerender } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          alwaysVisible={true}
-        />
-      );
-
-      expect(Animated.parallel).toHaveBeenCalled();
-
-      // Re-render with alwaysVisible=false
-      rerender(
-        <ScrollProgressTrack
-          {...defaultProps}
-          alwaysVisible={false}
-        />
-      );
-
-      expect(Animated.parallel).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('Position calculations', () => {
-    it('should clamp position values to valid range', () => {
-      const onScrollToPosition = jest.fn();
-      render(
-        <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-      );
-
-      // Above the track
-      lastTap().handlers.onEnd({ y: -50 });
-      expect(onScrollToPosition).toHaveBeenCalledWith(0);
-
-      // Below the track
-      lastTap().handlers.onEnd({ y: 600 });
-      expect(onScrollToPosition).toHaveBeenCalledWith(1);
-    });
-
-    it('should handle inverted position calculations', () => {
-      const onScrollToPosition = jest.fn();
-      render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          onScrollToPosition={onScrollToPosition}
-          inverted={true}
-        />
-      );
-
-      lastTap().handlers.onEnd({ y: 0 });
-      expect(onScrollToPosition).toHaveBeenCalledWith(1); // 1 - 0
-
-      lastTap().handlers.onEnd({ y: 500 });
-      expect(onScrollToPosition).toHaveBeenCalledWith(0); // 1 - 1
-    });
-  });
-  describe('Track visibility', () => {
-    it('should render track when trackVisible is true', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          styling={{ trackVisible: true }}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-
-    it('should not render track when trackVisible is false', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          styling={{ trackVisible: false }}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-  });
-
-  describe('Hit slop', () => {
-    it('should apply custom hit slop', () => {
-      const { toJSON } = render(
-        <ScrollProgressTrack
-          {...defaultProps}
-          hitSlop={36}
-        />
-      );
-      expect(toJSON()).toMatchSnapshot();
-    });
-  });
-
 });

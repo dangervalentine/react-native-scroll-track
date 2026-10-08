@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAnimatedRef } from "react-native-reanimated";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useAnimatedRef, useSharedValue, type SharedValue } from "react-native-reanimated";
 
 import type {
     FlatList,
+    LayoutChangeEvent,
     NativeScrollEvent,
     NativeSyntheticEvent,
     SectionList,
@@ -12,27 +13,59 @@ import type { ScrollView as RNGHScrollView } from "react-native-gesture-handler"
 
 
 import ScrollProgressTrack from "../ScrollProgressTrack";
-import { useAnimatedScrollPosition } from "./useAnimatedScrollPosition";
+import { useStableCallback } from "./useStableCallback";
 
 export interface ScrollTrackOptions {
     /** Whether the scroll track should always be visible (no fade out). Default: false */
     alwaysVisible?: boolean;
     /** Disable drag and tap gestures on the scroll track. Default: false */
     disableGestures?: boolean;
+    /** Disable tapping the track to jump, keeping the drag. Default: false */
+    disableTap?: boolean;
     /** Delay in milliseconds before the track fades out when not alwaysVisible. Default: 1000 */
     fadeOutDelay?: number;
-    /** Hit area expansion for gesture detection (in pixels). Default: 22 */
+    /** Hit area expansion for gesture detection (in pixels), added around `touchWidth`. Default: 22 */
     hitSlop?: number;
+    /**
+     * Width in pixels of the strip along the edge that takes touches, never
+     * narrower than the track. Default: 22 on iOS, 18 on Android
+     */
+    touchWidth?: number;
     /** Whether scrolling direction is inverted (thumb moves opposite to scroll). Default: false */
     inverted?: boolean;
     /** Minimum scroll distance required before showing the track. Default: 20 */
     minScrollDistanceToShow?: number;
+    /**
+     * Your own content-size handler. `scrollProps.onContentSizeChange` replaces
+     * the one on the scrollable, so pass it here and it is called after the
+     * track has read the size.
+     */
+    onContentSizeChange?: (width: number, height: number) => void;
+    /**
+     * Your own layout handler. `scrollProps.onLayout` replaces the one on the
+     * scrollable, so pass it here and it is called after the track has read
+     * the layout.
+     */
+    onLayout?: (event: LayoutChangeEvent) => void;
     /** Callback when user starts pressing/dragging the track. Default: empty function */
     onPressEnd?: () => void;
     /** Callback when user stops pressing/dragging the track. Default: empty function */
     onPressStart?: () => void;
-    /** Throttle scroll events (lower = more responsive, higher = better performance). Default: 1 */
+    /**
+     * Your own scroll handler. `scrollProps.onScroll` replaces the one on the
+     * scrollable, so pass it here and it is called after the track has read
+     * the event.
+     */
+    onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+    /** Throttle scroll events, in milliseconds between events. Default: 16 */
     scrollThrottle?: number;
+    /**
+     * A scroll offset you already keep up to date, for example from a worklet
+     * scroll handler or a list that reports its offset through its own
+     * callback. The track reads it, and `scrollProps.onScroll` then only
+     * forwards to your `onScroll`.
+     */
+    scrollY?: SharedValue<number>;
     /** Visual styling configuration for the scroll track */
     styling?: {
         /** Color of the scroll thumb. Default: '#00CED1' */
@@ -67,8 +100,11 @@ export interface ScrollTrackOptions {
         /** Z-index for the scroll track container. Default: 1000 */
         zIndex?: number;
     };
-    /** External ref to the scrollable component. Default: null */
-    externalRef?: React.RefObject<SupportedScrollRef> | React.RefObject<any>;
+    /**
+     * Your own ref to the scrollable component: a ref object or a callback
+     * ref. Default: null
+     */
+    externalRef?: React.Ref<SupportedScrollRef> | React.Ref<any>;
 }
 
 export type SupportedScrollRef =
@@ -83,13 +119,14 @@ export type SupportedScrollRef =
 export const defaultScrollTrackOptions = {
     alwaysVisible: false,
     disableGestures: false,
+    disableTap: false,
     fadeOutDelay: 1000,
     hitSlop: 22,
     inverted: false,
     minScrollDistanceToShow: 20,
     onPressEnd: () => { },
     onPressStart: () => { },
-    scrollThrottle: 1,
+    scrollThrottle: 16,
     styling: {
         thumbColor: '#00CED1',
         thumbBorderRadius: 0,
@@ -110,10 +147,18 @@ export const defaultScrollTrackOptions = {
     },
 } as const;
 
+/**
+ * The track is not mounted for a viewport shorter than this: there is no room
+ * for a thumb worth dragging.
+ */
+const MIN_CONTAINER_HEIGHT = 100;
+
 export const useScrollTrack = (options?: ScrollTrackOptions) => {
     const {
         alwaysVisible = defaultScrollTrackOptions.alwaysVisible,
         disableGestures = defaultScrollTrackOptions.disableGestures,
+        disableTap = defaultScrollTrackOptions.disableTap,
+        touchWidth,
         fadeOutDelay = defaultScrollTrackOptions.fadeOutDelay,
         hitSlop = defaultScrollTrackOptions.hitSlop,
         inverted = defaultScrollTrackOptions.inverted,
@@ -123,6 +168,10 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         scrollThrottle = defaultScrollTrackOptions.scrollThrottle,
         styling: userStyling,
         externalRef,
+        scrollY: callerScrollY,
+        onScroll: userOnScroll,
+        onLayout: userOnLayout,
+        onContentSizeChange: userOnContentSizeChange,
     } = options || {};
 
     // Merge user styling with defaults, including nested thumbShadow
@@ -138,137 +187,153 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         };
     }, [userStyling]);
 
-    const scrollRef = (externalRef as React.RefObject<any>) ?? useAnimatedRef<any>();
-    const { createScrollHandler, rawScrollValue, setScrollValue } = useAnimatedScrollPosition();
+    // The scrollable's node is reached through one of three refs: the caller's
+    // ref object, our own, or (for a callback ref, which holds nothing we can
+    // read) a holder filled in as the node is handed on to the caller.
+    const ownRef = useAnimatedRef<any>();
+    const callbackNodeRef = useRef<any>(null);
+    const hasCallbackRef = typeof externalRef === "function";
 
-    const [containerHeight, setContainerHeight] = useState(0);
-    const [contentHeight, setContentHeight] = useState(0);
-    const [isAutoHidden, setIsAutoHidden] = useState(true);
-    const [isDragging, setIsDragging] = useState(false);
+    const setCallbackRef = useCallback(
+        (node: any) => {
+            callbackNodeRef.current = node;
+            if (typeof externalRef !== "function") return undefined;
 
-    const isScrollable = useMemo(() => {
+            // React 19 lets a callback ref return a cleanup, which then runs in
+            // place of the call with null.
+            const cleanup: unknown = externalRef(node);
+            if (typeof cleanup !== "function") return undefined;
+            return () => {
+                callbackNodeRef.current = null;
+                cleanup();
+            };
+        },
+        [externalRef]
+    );
+
+    const scrollRef: React.RefObject<any> = hasCallbackRef
+        ? callbackNodeRef
+        : (externalRef as React.RefObject<any> | null | undefined) ?? ownRef;
+
+    // Stable identities, so an inline handler from the consumer does not hand
+    // the scrollable a new prop on every render.
+    const notifyScroll = useStableCallback<[NativeSyntheticEvent<NativeScrollEvent>]>(userOnScroll);
+    const notifyLayout = useStableCallback<[LayoutChangeEvent]>(userOnLayout);
+    const notifyContentSizeChange = useStableCallback<[number, number]>(userOnContentSizeChange);
+
+    // Geometry and the offset live in shared values: the track reads them on
+    // the UI thread, and a change re-renders nothing.
+    const ownScrollY = useSharedValue(0);
+    const scrollY = callerScrollY ?? ownScrollY;
+    const containerHeight = useSharedValue(0);
+    const contentHeight = useSharedValue(0);
+    const containerOffsetY = useSharedValue(0);
+
+    // JS copies of the same heights, for the scrollTo arithmetic.
+    const containerHeightRef = useRef(0);
+    const contentHeightRef = useRef(0);
+
+    // The one piece of React state: whether there is enough to scroll for the
+    // track to be mounted at all. It changes only when that answer does.
+    const [isScrollable, setIsScrollable] = useState(false);
+    const isScrollableRef = useRef(false);
+
+    const updateScrollable = useCallback(() => {
+        const container = containerHeightRef.current;
+        const content = contentHeightRef.current;
         // A container with no height cannot scroll, and reports no height until
         // it has been laid out, so guard against saying otherwise too early.
-        if (containerHeight <= 0) return false;
-        return contentHeight - containerHeight > minScrollDistanceToShow;
-    }, [contentHeight, containerHeight, minScrollDistanceToShow]);
+        const scrollable =
+            container >= MIN_CONTAINER_HEIGHT && content - container > minScrollDistanceToShow;
 
-    const autoHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const clearAutoHideTimer = useCallback(() => {
-        if (autoHideTimer.current) {
-            clearTimeout(autoHideTimer.current);
-            autoHideTimer.current = null;
-        }
-    }, []);
-
-    const startAutoHideTimer = useCallback(() => {
-        clearAutoHideTimer();
-        setIsAutoHidden(false);
-        if (!alwaysVisible) {
-            autoHideTimer.current = setTimeout(() => {
-                setIsAutoHidden(true);
-            }, fadeOutDelay);
-        }
-    }, [alwaysVisible, clearAutoHideTimer, fadeOutDelay]);
-
-    useEffect(() => () => clearAutoHideTimer(), [clearAutoHideTimer]);
+        // Only a changed answer reaches React: setting state to its current
+        // value can still cost the host a render.
+        if (scrollable === isScrollableRef.current) return;
+        isScrollableRef.current = scrollable;
+        setIsScrollable(scrollable);
+    }, [minScrollDistanceToShow]);
 
     const onLayout = useCallback((e: any) => {
-        const height = e.nativeEvent.layout.height;
-        setContainerHeight(height);
-    }, []);
+        const { height, y } = e.nativeEvent.layout;
+        containerHeightRef.current = height;
+        containerHeight.value = height;
+        containerOffsetY.value = y ?? 0;
+        updateScrollable();
+        notifyLayout(e);
+    }, [containerHeight, containerOffsetY, notifyLayout, updateScrollable]);
 
-    const onContentSizeChange = useCallback((_: number, height: number) => {
-        setContentHeight(height);
-    }, []);
+    const onContentSizeChange = useCallback((width: number, height: number) => {
+        contentHeightRef.current = height;
+        contentHeight.value = height;
+        updateScrollable();
+        notifyContentSizeChange(width, height);
+    }, [contentHeight, notifyContentSizeChange, updateScrollable]);
 
-    const onScrollInternal = useMemo(
-        () => createScrollHandler(contentHeight, containerHeight),
-        [createScrollHandler, contentHeight, containerHeight]
-    );
+    const ownsScrollY = !callerScrollY;
 
     const onScroll = useCallback(
         (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-            onScrollInternal(event);
-
-            if (isScrollable) {
-                alwaysVisible ? setIsAutoHidden(false) : startAutoHideTimer();
-            } else {
-                clearAutoHideTimer();
-                setIsAutoHidden(false);
+            if (ownsScrollY) {
+                const y = event?.nativeEvent?.contentOffset?.y;
+                if (typeof y === "number" && !Number.isNaN(y)) ownScrollY.value = y;
             }
+            notifyScroll(event);
         },
-        [onScrollInternal, alwaysVisible, clearAutoHideTimer, startAutoHideTimer, isScrollable]
+        [notifyScroll, ownScrollY, ownsScrollY]
     );
 
     const scrollToPosition = useCallback(
-        (position: number) => {
-            if (!scrollRef.current) return;
+        (position: number, animated: boolean = true) => {
+            const node = scrollRef.current;
+            if (!node || Number.isNaN(position)) return;
 
-            startAutoHideTimer();
-            const maxOffset = Math.max(0, contentHeight - containerHeight);
-            const targetOffset = position * maxOffset;
-            setScrollValue(targetOffset);
+            const maxOffset = Math.max(0, contentHeightRef.current - containerHeightRef.current);
+            const targetOffset = Math.max(0, Math.min(1, position)) * maxOffset;
 
-            const isAnimated = !isDragging;
+            // While scrubbing, move the thumb with the finger rather than
+            // waiting for the scroll event to come back round.
+            if (!animated && ownsScrollY) ownScrollY.value = targetOffset;
 
-            if (scrollRef.current.scrollToOffset) {
-                scrollRef.current.scrollToOffset({ offset: targetOffset, animated: isAnimated });
-            } else if (scrollRef.current.scrollTo) {
-                scrollRef.current.scrollTo({ y: targetOffset, animated: isAnimated });
-            } else if (scrollRef.current.getScrollResponder?.()?.scrollTo) {
-                scrollRef.current.getScrollResponder().scrollTo({ y: targetOffset, animated: isAnimated });
-            } else if (scrollRef.current._listRef?.scrollToOffset) {
-                scrollRef.current._listRef.scrollToOffset({ offset: targetOffset, animated: isAnimated });
+            if (node.scrollToOffset) {
+                node.scrollToOffset({ offset: targetOffset, animated });
+            } else if (node.scrollTo) {
+                node.scrollTo({ y: targetOffset, animated });
+            } else if (node.getScrollResponder?.()?.scrollTo) {
+                node.getScrollResponder().scrollTo({ y: targetOffset, animated });
+            } else if (node._listRef?.scrollToOffset) {
+                node._listRef.scrollToOffset({ offset: targetOffset, animated });
             }
         },
-        [containerHeight, contentHeight, isDragging, setScrollValue, startAutoHideTimer]
+        [ownScrollY, ownsScrollY, scrollRef]
     );
 
-    const handleDragStart = useCallback(() => {
-        setIsDragging(true);
-        clearAutoHideTimer();
-        setIsAutoHidden(false);
-    }, [clearAutoHideTimer]);
-
-    const handleDragEnd = useCallback(() => {
-        setIsDragging(false);
-        if (!alwaysVisible) {
-            // Use setTimeout to ensure state update has processed
-            setTimeout(() => {
-                startAutoHideTimer();
-            }, 0);
-        }
-    }, [startAutoHideTimer, alwaysVisible]);
-
     const ScrollTrack = useMemo(() => {
-        if (containerHeight < 100 || contentHeight <= containerHeight) return null;
+        if (!isScrollable) return null;
 
         return (
             <ScrollProgressTrack
                 alwaysVisible={alwaysVisible}
-                animatedScrollPosition={rawScrollValue}
                 containerHeight={containerHeight}
+                containerOffsetY={containerOffsetY}
                 contentHeight={contentHeight}
                 disableGestures={disableGestures}
+                disableTap={disableTap}
+                fadeOutDelay={fadeOutDelay}
                 hitSlop={hitSlop}
                 inverted={inverted}
-                onDragEnd={handleDragEnd}
-                onDragStart={handleDragStart}
                 onPressEnd={onPressEnd}
                 onPressStart={onPressStart}
                 onScrollToPosition={scrollToPosition}
-                scrollPosition={0}
+                scrollY={scrollY}
                 styling={styling}
-                visible={alwaysVisible || (!isAutoHidden && isScrollable)}
+                touchWidth={touchWidth}
             />
         );
-    }, [containerHeight, contentHeight, rawScrollValue, scrollToPosition, isAutoHidden, isScrollable, inverted, styling, handleDragStart, handleDragEnd, onPressStart, onPressEnd, alwaysVisible, disableGestures]);
+    }, [isScrollable, alwaysVisible, containerHeight, containerOffsetY, contentHeight, disableGestures, disableTap, touchWidth, fadeOutDelay, hitSlop, inverted, onPressEnd, onPressStart, scrollToPosition, scrollY, styling]);
 
     return {
         scrollProps: {
-            ref: scrollRef,
+            ref: (hasCallbackRef ? setCallbackRef : scrollRef) as React.Ref<any>,
             onScroll,
             onLayout,
             onContentSizeChange,
@@ -279,7 +344,7 @@ export const useScrollTrack = (options?: ScrollTrackOptions) => {
         ScrollTrack,
         scrollToPosition,
         isScrollable,
-        isVisible: isScrollable && (alwaysVisible || !isAutoHidden),
-        scrollRef
+        scrollRef,
+        scrollY,
     };
 };

@@ -35,10 +35,14 @@ export const resolveThumbHeight = ({
     thumbHeight,
     minThumbHeight,
 }: ThumbHeightConfig): number => {
+    // Runs inside the thumb's animated style, on the UI thread.
+    'worklet';
     if (contentHeight <= containerHeight) return 0;
 
-    const clampToTrack = (height: number) =>
-        Math.max(0, Math.min(height, availableHeight));
+    const clampToTrack = (height: number) => {
+        'worklet';
+        return Math.max(0, Math.min(height, availableHeight));
+    };
 
     // An explicit height is a command, not a hint: skip the ratio and the cap.
     if (thumbHeight !== undefined) return clampToTrack(thumbHeight);

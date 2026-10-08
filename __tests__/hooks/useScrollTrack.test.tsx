@@ -1,378 +1,374 @@
 import React from 'react';
-import { renderHook, act } from '@testing-library/react-hooks';
+import { act, renderHook } from '@testing-library/react-native';
+import { makeMutable } from 'react-native-reanimated';
+
 import { useScrollTrack, defaultScrollTrackOptions } from '../../src/hooks/useScrollTrack';
+import { renderScrollTrack } from '../helpers/hook';
 import { scrollEvent } from '../helpers/scrollEvent';
 
-// Mock the animated scroll position hook
-jest.mock('../../src/hooks/useAnimatedScrollPosition', () => ({
-  useAnimatedScrollPosition: () => ({
-    createScrollHandler: jest.fn(() => jest.fn()),
-    rawScrollValue: global.mockAnimatedValue(),
-    setScrollValue: jest.fn(),
-  }),
-}));
-
-// Mock the ScrollProgressTrack component
-jest.mock('../../src/ScrollProgressTrack', () => {
-  return function MockScrollProgressTrack(props: Record<string, unknown>) {
-    return React.createElement('ScrollProgressTrack', { ...props, testID: 'scroll-progress-track' });
-  };
-});
+/** Attaches a stand-in scrollable to the hook's own ref. */
+const attach = (hook: ReturnType<typeof renderScrollTrack>, node: unknown) => {
+    (hook.current().scrollRef as React.MutableRefObject<unknown>).current = node;
+};
 
 describe('useScrollTrack', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jest.clearAllTimers();
-  });
+    describe('initialization', () => {
+        it('starts with the default options and nothing to scroll', () => {
+            const hook = renderScrollTrack();
 
-  afterEach(() => {
-    jest.runOnlyPendingTimers();
-  });
-
-  describe('Hook initialization', () => {
-    it('should initialize with default options', () => {
-      const { result } = renderHook(() => useScrollTrack());
-
-      expect(result.current.scrollProps).toEqual(
-        expect.objectContaining({
-          scrollEventThrottle: 1,
-          showsVerticalScrollIndicator: false,
-          inverted: false,
-        })
-      );
-      expect(result.current.isScrollable).toBe(false);
-      expect(result.current.isVisible).toBe(false);
-      expect(result.current.scrollToPosition).toBeDefined();
-      expect(result.current.ScrollTrack).toBeNull();
-    });
-
-    it('should accept custom options', () => {
-      const customOptions = {
-        scrollThrottle: 16,
-        inverted: true,
-        alwaysVisible: true,
-        fadeOutDelay: 2000,
-      };
-
-      const { result } = renderHook(() => useScrollTrack(customOptions));
-
-      expect(result.current.scrollProps.scrollEventThrottle).toBe(16);
-      expect(result.current.scrollProps.inverted).toBe(true);
-    });
-
-    it('should merge styling options with defaults', () => {
-      const customStyling = {
-        thumbColor: '#ff0000',
-        trackWidth: 8,
-        thumbShadow: { color: '#333333' },
-      };
-
-      const { result } = renderHook(() => useScrollTrack({ styling: customStyling }));
-
-      // The merged styling should be available internally
-      // We can't directly access it, but we can verify the hook doesn't crash
-      expect(result.current.scrollProps).toBeDefined();
-    });
-  });
-
-  describe('Scroll state management', () => {
-    it('should update scrollable state when content changes', () => {
-      const { result } = renderHook(() => useScrollTrack({ minScrollDistanceToShow: 20 }));
-
-      // Initially not scrollable
-      expect(result.current.isScrollable).toBe(false);
-
-      // Simulate container layout
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            expect(hook.current().scrollProps).toEqual(
+                expect.objectContaining({
+                    scrollEventThrottle: 16,
+                    showsVerticalScrollIndicator: false,
+                    inverted: false,
+                })
+            );
+            expect(hook.current().isScrollable).toBe(false);
+            expect(hook.current().ScrollTrack).toBeNull();
+            expect(hook.current().scrollY.value).toBe(0);
         });
-      });
 
-      // Still not scrollable with no content
-      expect(result.current.isScrollable).toBe(false);
+        it('accepts custom options', () => {
+            const hook = renderScrollTrack({ scrollThrottle: 32, inverted: true });
 
-      // Simulate content size change
-      act(() => {
-        result.current.scrollProps.onContentSizeChange(0, 600);
-      });
-
-      // Now should be scrollable (600 - 500 = 100 > 20)
-      expect(result.current.isScrollable).toBe(true);
-    });
-
-    it('should not be scrollable when content is smaller than container', () => {
-      const { result } = renderHook(() => useScrollTrack({ minScrollDistanceToShow: 20 }));
-
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            expect(hook.current().scrollProps.scrollEventThrottle).toBe(32);
+            expect(hook.current().scrollProps.inverted).toBe(true);
         });
-        result.current.scrollProps.onContentSizeChange(0, 400);
-      });
 
-      expect(result.current.isScrollable).toBe(false);
-    });
-
-    it('should not be scrollable when scroll distance is below minimum', () => {
-      const { result } = renderHook(() => useScrollTrack({ minScrollDistanceToShow: 50 }));
-
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+        it.each([undefined, null, {}])('tolerates %p for options', (options) => {
+            expect(() => renderHook(() => useScrollTrack(options as any))).not.toThrow();
         });
-        result.current.scrollProps.onContentSizeChange(0, 530); // Only 30px difference
-      });
 
-      expect(result.current.isScrollable).toBe(false);
-    });
-  });
-
-  describe('Auto-hide behavior', () => {
-    it('should auto-hide track after fadeOutDelay', () => {
-      const { result } = renderHook(() => useScrollTrack({ fadeOutDelay: 1000 }));
-
-      // Make content scrollable
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+        it('exports its defaults', () => {
+            expect(defaultScrollTrackOptions).toEqual(
+                expect.objectContaining({
+                    alwaysVisible: false,
+                    disableGestures: false,
+                    disableTap: false,
+                    fadeOutDelay: 1000,
+                    hitSlop: 22,
+                    inverted: false,
+                    minScrollDistanceToShow: 20,
+                    scrollThrottle: 16,
+                })
+            );
+            expect(defaultScrollTrackOptions.styling.trackWidth).toBe(4);
         });
-        result.current.scrollProps.onContentSizeChange(0, 1000);
-      });
-
-      // Simulate scroll event
-      act(() => {
-        result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
-      });
-
-      // Should be visible initially
-      expect(result.current.isVisible).toBe(true);
-
-      // Fast forward time
-      act(() => {
-        jest.advanceTimersByTime(1000);
-      });
-
-      // Should be hidden now
-      expect(result.current.isVisible).toBe(false);
     });
 
-    it('should not auto-hide when alwaysVisible is true', () => {
-      const { result } = renderHook(() => useScrollTrack({ alwaysVisible: true }));
+    describe('whether there is anything to scroll', () => {
+        it('becomes scrollable once the content outgrows the viewport', () => {
+            const hook = renderScrollTrack();
 
-      // Make content scrollable
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            hook.measure({ container: 500, content: 1000 });
+
+            expect(hook.current().isScrollable).toBe(true);
+            expect(hook.current().ScrollTrack).not.toBeNull();
         });
-        result.current.scrollProps.onContentSizeChange(0, 1000);
-      });
 
-      // Simulate scroll event
-      act(() => {
-        result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
-      });
+        it('is not scrollable when the content fits', () => {
+            const hook = renderScrollTrack();
 
-      // Should be visible
-      expect(result.current.isVisible).toBe(true);
+            hook.measure({ container: 500, content: 400 });
 
-      // Fast forward time
-      act(() => {
-        jest.advanceTimersByTime(2000);
-      });
-
-      // Should still be visible
-      expect(result.current.isVisible).toBe(true);
-    });
-
-    it('should reset auto-hide timer on new scroll events', () => {
-      const { result } = renderHook(() => useScrollTrack({ fadeOutDelay: 1000 }));
-
-      // Make content scrollable
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            expect(hook.current().isScrollable).toBe(false);
+            expect(hook.current().ScrollTrack).toBeNull();
         });
-        result.current.scrollProps.onContentSizeChange(0, 1000);
-      });
 
-      // First scroll event
-      act(() => {
-        result.current.scrollProps.onScroll(scrollEvent({ y: 100, containerHeight: 500, contentHeight: 1000 }));
-      });
+        it('is not scrollable below minScrollDistanceToShow', () => {
+            const hook = renderScrollTrack({ minScrollDistanceToShow: 50 });
 
-      // Wait 800ms
-      act(() => {
-        jest.advanceTimersByTime(800);
-      });
+            hook.measure({ container: 500, content: 530 });
+            expect(hook.current().isScrollable).toBe(false);
 
-      // Second scroll event should reset timer
-      act(() => {
-        result.current.scrollProps.onScroll(scrollEvent({ y: 200, containerHeight: 500, contentHeight: 1000 }));
-      });
-
-      // Wait another 800ms (total 1600ms from first scroll)
-      act(() => {
-        jest.advanceTimersByTime(800);
-      });
-
-      // Should still be visible because timer was reset
-      expect(result.current.isVisible).toBe(true);
-
-      // Wait remaining 200ms
-      act(() => {
-        jest.advanceTimersByTime(200);
-      });
-
-      // Now should be hidden
-      expect(result.current.isVisible).toBe(false);
-    });
-  });
-
-  describe('scrollToPosition function', () => {
-    it('should call correct scroll method for different ref types', () => {
-      const { result } = renderHook(() => useScrollTrack());
-
-      // Mock FlatList ref
-      const flatListRef = {
-        scrollToOffset: jest.fn(),
-      };
-
-      // Mock ScrollView ref
-      const scrollViewRef = {
-        scrollTo: jest.fn(),
-      };
-
-      // Mock ref with getScrollResponder. The responder must be a single stable
-      // object, or asserting on getScrollResponder().scrollTo would inspect a
-      // freshly created mock that was never called.
-      const scrollResponder = { scrollTo: jest.fn() };
-      const responderRef = {
-        getScrollResponder: jest.fn(() => scrollResponder),
-      };
-
-      // Test FlatList scrolling
-      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = flatListRef;
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            hook.measure({ container: 500, content: 560 });
+            expect(hook.current().isScrollable).toBe(true);
         });
-        result.current.scrollProps.onContentSizeChange(0, 1000);
-      });
 
-      act(() => {
-        result.current.scrollToPosition(0.5);
-      });
+        it('mounts no track for a viewport under 100pt', () => {
+            const hook = renderScrollTrack();
 
-      expect(flatListRef.scrollToOffset).toHaveBeenCalledWith({
-        offset: 250, // 0.5 * (1000 - 500) = 250
-        animated: true,
-      });
+            hook.measure({ container: 80, content: 1000 });
 
-      // Test ScrollView scrolling
-      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = scrollViewRef;
-      act(() => {
-        result.current.scrollToPosition(0.25);
-      });
-
-      expect(scrollViewRef.scrollTo).toHaveBeenCalledWith({
-        y: 125, // 0.25 * (1000 - 500) = 125
-        animated: true,
-      });
-
-      // Test getScrollResponder
-      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = responderRef;
-      act(() => {
-        result.current.scrollToPosition(0.75);
-      });
-
-      expect(responderRef.getScrollResponder).toHaveBeenCalled();
-      expect(scrollResponder.scrollTo).toHaveBeenCalledWith({
-        y: 375, // 0.75 * (1000 - 500) = 375
-        animated: true,
-      });
-    });
-
-    it('should handle null ref gracefully', () => {
-      const { result } = renderHook(() => useScrollTrack());
-
-      (result.current.scrollProps.ref as React.MutableRefObject<any>).current = null;
-
-      expect(() => {
-        act(() => {
-          result.current.scrollToPosition(0.5);
+            expect(hook.current().isScrollable).toBe(false);
+            expect(hook.current().ScrollTrack).toBeNull();
         });
-      }).not.toThrow();
-    });
-  });
 
-  describe('ScrollTrack rendering', () => {
-    it('should render ScrollTrack when content is scrollable', () => {
-      const { result } = renderHook(() => useScrollTrack());
+        it('follows the content as it shrinks and grows again', () => {
+            const hook = renderScrollTrack();
 
-      // Make content scrollable
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            hook.measure({ container: 500, content: 1000 });
+            hook.measure({ container: 500, content: 300 });
+            expect(hook.current().ScrollTrack).toBeNull();
+
+            hook.measure({ container: 500, content: 1200 });
+            expect(hook.current().ScrollTrack).not.toBeNull();
         });
-        result.current.scrollProps.onContentSizeChange(0, 1000);
-      });
 
-      expect(result.current.ScrollTrack).not.toBeNull();
-    });
+        it.each([
+            ['zero', 0, 0],
+            ['negative', -100, -50],
+            ['fractional', 500.5, 500.75],
+        ])('does not throw on %s dimensions', (_name, container, content) => {
+            const hook = renderScrollTrack();
 
-    it('should not render ScrollTrack when content is not scrollable', () => {
-      const { result } = renderHook(() => useScrollTrack());
-
-      // Make content not scrollable
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 500 } },
+            expect(() => hook.measure({ container, content })).not.toThrow();
+            expect(hook.current().isScrollable).toBe(false);
         });
-        result.current.scrollProps.onContentSizeChange(0, 400);
-      });
-
-      expect(result.current.ScrollTrack).toBeNull();
     });
 
-    it('should not render ScrollTrack when container is too small', () => {
-      const { result } = renderHook(() => useScrollTrack());
+    describe('scroll offset', () => {
+        it('tracks the offset in a shared value', () => {
+            const hook = renderScrollTrack();
+            hook.measure();
 
-      // Make container too small
-      act(() => {
-        result.current.scrollProps.onLayout({
-          nativeEvent: { layout: { height: 50 } },
+            hook.scroll(240);
+
+            expect(hook.current().scrollY.value).toBe(240);
         });
-        result.current.scrollProps.onContentSizeChange(0, 1000);
-      });
 
-      expect(result.current.ScrollTrack).toBeNull();
+        it('does not re-render the host while scrolling', () => {
+            const hook = renderScrollTrack();
+            hook.measure();
+            const before = hook.renders();
+
+            for (let y = 0; y <= 500; y += 10) hook.scroll(y);
+            act(() => {
+                jest.advanceTimersByTime(5000);
+            });
+
+            expect(hook.renders()).toBe(before);
+        });
+
+        it('does not re-render the host when the content size changes but still scrolls', () => {
+            const hook = renderScrollTrack();
+            hook.measure({ container: 500, content: 1000 });
+            const before = hook.renders();
+
+            hook.measure({ container: 500, content: 1400 });
+            hook.measure({ container: 500, content: 2600 });
+
+            expect(hook.renders()).toBe(before);
+        });
+
+        it.each([
+            ['no nativeEvent', {}],
+            ['no contentOffset', { nativeEvent: {} }],
+            ['a null offset', { nativeEvent: { contentOffset: { y: null } } }],
+            ['an undefined offset', { nativeEvent: { contentOffset: {} } }],
+            ['NaN', { nativeEvent: { contentOffset: { y: NaN } } }],
+        ])('ignores a scroll event with %s', (_name, event) => {
+            const hook = renderScrollTrack();
+            hook.measure();
+            hook.scroll(120);
+
+            expect(() => {
+                act(() => {
+                    hook.current().scrollProps.onScroll(event as any);
+                });
+            }).not.toThrow();
+            expect(hook.current().scrollY.value).toBe(120);
+        });
+
+        it('reads a scrollY the caller keeps up to date, and leaves it alone', () => {
+            const scrollY = makeMutable(75);
+            const onScroll = jest.fn();
+            const hook = renderScrollTrack({ scrollY, onScroll });
+            hook.measure();
+
+            expect(hook.current().scrollY).toBe(scrollY);
+
+            hook.scroll(300);
+
+            // The caller owns the value: the scroll event is only passed on.
+            expect(scrollY.value).toBe(75);
+            expect(onScroll).toHaveBeenCalledTimes(1);
+        });
     });
-  });
 
-  describe('Callbacks', () => {
-    it('should call onPressStart and onPressEnd callbacks', () => {
-      const onPressStart = jest.fn();
-      const onPressEnd = jest.fn();
+    describe('scrollToPosition', () => {
+        it('uses whichever scroll method the node has', () => {
+            const hook = renderScrollTrack();
+            hook.measure({ container: 500, content: 1000 });
 
-      const { result } = renderHook(() => useScrollTrack({ onPressStart, onPressEnd }));
+            const flatList = { scrollToOffset: jest.fn() };
+            attach(hook, flatList);
+            act(() => hook.current().scrollToPosition(0.5));
+            expect(flatList.scrollToOffset).toHaveBeenCalledWith({ offset: 250, animated: true });
 
-      // The callbacks should be passed to the ScrollProgressTrack component
-      // We verify this by checking that the hook doesn't throw errors
-      expect(result.current.scrollProps).toBeDefined();
-      expect(onPressStart).not.toHaveBeenCalled();
-      expect(onPressEnd).not.toHaveBeenCalled();
+            const scrollView = { scrollTo: jest.fn() };
+            attach(hook, scrollView);
+            act(() => hook.current().scrollToPosition(0.25));
+            expect(scrollView.scrollTo).toHaveBeenCalledWith({ y: 125, animated: true });
+
+            const responder = { scrollTo: jest.fn() };
+            attach(hook, { getScrollResponder: () => responder });
+            act(() => hook.current().scrollToPosition(0.75));
+            expect(responder.scrollTo).toHaveBeenCalledWith({ y: 375, animated: true });
+
+            const inner = { scrollToOffset: jest.fn() };
+            attach(hook, { _listRef: inner });
+            act(() => hook.current().scrollToPosition(1));
+            expect(inner.scrollToOffset).toHaveBeenCalledWith({ offset: 500, animated: true });
+        });
+
+        it('scrolls without animation, moving the thumb at once, while scrubbing', () => {
+            const hook = renderScrollTrack();
+            hook.measure({ container: 500, content: 1000 });
+            const node = { scrollToOffset: jest.fn() };
+            attach(hook, node);
+
+            act(() => hook.current().scrollToPosition(0.5, false));
+
+            expect(node.scrollToOffset).toHaveBeenCalledWith({ offset: 250, animated: false });
+            expect(hook.current().scrollY.value).toBe(250);
+        });
+
+        it('leaves the offset to the scroll events for an animated jump', () => {
+            const hook = renderScrollTrack();
+            hook.measure({ container: 500, content: 1000 });
+            attach(hook, { scrollToOffset: jest.fn() });
+
+            act(() => hook.current().scrollToPosition(0.5));
+
+            expect(hook.current().scrollY.value).toBe(0);
+        });
+
+        it('clamps a position outside 0 to 1', () => {
+            const hook = renderScrollTrack();
+            hook.measure({ container: 500, content: 1000 });
+            const node = { scrollToOffset: jest.fn() };
+            attach(hook, node);
+
+            act(() => hook.current().scrollToPosition(-0.5));
+            act(() => hook.current().scrollToPosition(1.5));
+            act(() => hook.current().scrollToPosition(Infinity));
+
+            expect(node.scrollToOffset).toHaveBeenNthCalledWith(1, { offset: 0, animated: true });
+            expect(node.scrollToOffset).toHaveBeenNthCalledWith(2, { offset: 500, animated: true });
+            expect(node.scrollToOffset).toHaveBeenNthCalledWith(3, { offset: 500, animated: true });
+        });
+
+        it('ignores NaN', () => {
+            const hook = renderScrollTrack();
+            hook.measure();
+            const node = { scrollToOffset: jest.fn() };
+            attach(hook, node);
+
+            act(() => hook.current().scrollToPosition(NaN));
+
+            expect(node.scrollToOffset).not.toHaveBeenCalled();
+        });
+
+        it('does nothing without a node, or with one that cannot scroll', () => {
+            const hook = renderScrollTrack();
+            hook.measure();
+
+            expect(() => act(() => hook.current().scrollToPosition(0.5))).not.toThrow();
+
+            attach(hook, {});
+            expect(() => act(() => hook.current().scrollToPosition(0.5))).not.toThrow();
+        });
     });
-  });
 
-  describe('Default options', () => {
-    it('should export default options', () => {
-      expect(defaultScrollTrackOptions).toBeDefined();
-      expect(defaultScrollTrackOptions.alwaysVisible).toBe(false);
-      expect(defaultScrollTrackOptions.fadeOutDelay).toBe(1000);
-      expect(defaultScrollTrackOptions.scrollThrottle).toBe(1);
-      expect(defaultScrollTrackOptions.styling.thumbColor).toBe('#00CED1');
-      expect(defaultScrollTrackOptions.styling.trackWidth).toBe(4);
+    describe('handler pass-through', () => {
+        it('calls the consumer handlers after reading the event itself', () => {
+            const onScroll = jest.fn();
+            const onLayout = jest.fn();
+            const onContentSizeChange = jest.fn();
+            const hook = renderScrollTrack({ onScroll, onLayout, onContentSizeChange });
+
+            const layoutEvent = { nativeEvent: { layout: { height: 500, y: 0 } } };
+            const event = scrollEvent({ y: 100 });
+
+            act(() => {
+                hook.current().scrollProps.onLayout(layoutEvent);
+                hook.current().scrollProps.onContentSizeChange(300, 1000);
+                hook.current().scrollProps.onScroll(event);
+            });
+
+            expect(onLayout).toHaveBeenCalledWith(layoutEvent);
+            expect(onContentSizeChange).toHaveBeenCalledWith(300, 1000);
+            expect(onScroll).toHaveBeenCalledWith(event);
+            // The track still read the same events.
+            expect(hook.current().isScrollable).toBe(true);
+            expect(hook.current().scrollY.value).toBe(100);
+        });
+
+        it('keeps handler identities stable when the consumer passes inline handlers', () => {
+            const first = jest.fn();
+            const second = jest.fn();
+            const hook = renderScrollTrack({ onLayout: first, onScroll: () => {} });
+
+            const before = hook.current().scrollProps;
+            hook.rerender({ onLayout: second, onScroll: () => {} });
+
+            expect(hook.current().scrollProps.onLayout).toBe(before.onLayout);
+            expect(hook.current().scrollProps.onScroll).toBe(before.onScroll);
+            expect(hook.current().scrollProps.onContentSizeChange).toBe(before.onContentSizeChange);
+
+            hook.measure();
+
+            expect(first).not.toHaveBeenCalled();
+            expect(second).toHaveBeenCalledTimes(1);
+        });
     });
-  });
+
+    describe('externalRef', () => {
+        it('hands a ref object straight to the scrollable', () => {
+            const externalRef = { current: null };
+            const hook = renderScrollTrack({ externalRef });
+
+            expect(hook.current().scrollProps.ref).toBe(externalRef);
+            expect(hook.current().scrollRef).toBe(externalRef);
+        });
+
+        it('accepts a ref that arrives after the first render', () => {
+            const externalRef = { current: null };
+            const hook = renderScrollTrack();
+
+            // A change in hook order throws out of the render.
+            expect(() => hook.rerender({ externalRef })).not.toThrow();
+
+            expect(hook.current().scrollProps.ref).toBe(externalRef);
+        });
+
+        it('forwards the node to a callback ref and still scrolls it', () => {
+            const externalRef = jest.fn();
+            const node = { scrollToOffset: jest.fn() };
+            const hook = renderScrollTrack({ externalRef });
+
+            const setRef = hook.current().scrollProps.ref as (node: unknown) => void;
+            expect(typeof setRef).toBe('function');
+
+            act(() => {
+                setRef(node);
+            });
+            hook.measure({ container: 500, content: 1000 });
+
+            expect(externalRef).toHaveBeenCalledWith(node);
+            expect(hook.current().scrollRef.current).toBe(node);
+
+            act(() => hook.current().scrollToPosition(0.5));
+
+            expect(node.scrollToOffset).toHaveBeenCalledWith({ offset: 250, animated: true });
+        });
+
+        it('runs the cleanup a callback ref returns', () => {
+            const cleanup = jest.fn();
+            const externalRef = jest.fn(() => cleanup);
+            const node = { scrollToOffset: jest.fn() };
+            const hook = renderScrollTrack({ externalRef });
+
+            const setRef = hook.current().scrollProps.ref as (node: unknown) => (() => void) | undefined;
+            const release = setRef(node);
+
+            expect(hook.current().scrollRef.current).toBe(node);
+
+            release?.();
+
+            expect(cleanup).toHaveBeenCalledTimes(1);
+            expect(hook.current().scrollRef.current).toBeNull();
+        });
+    });
 });

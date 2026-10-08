@@ -1,77 +1,47 @@
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { Animated, StyleSheet } from 'react-native';
-import ScrollProgressTrack from '../../src/ScrollProgressTrack';
-
-/**
- * Reads the resolved height of the rendered thumb. The thumb is the only view
- * carrying a backgroundColor, which is how we pick it out of the tree.
- */
-const renderedThumbHeight = (tree: any, thumbColor: string): number => {
-    const found: number[] = [];
-
-    const walk = (node: any) => {
-        if (!node || typeof node !== 'object') return;
-        const flat = StyleSheet.flatten(node.props?.style) as any;
-        if (flat?.backgroundColor === thumbColor) found.push(flat.height);
-        (node.children || []).forEach(walk);
-    };
-
-    walk(tree);
-    expect(found).toHaveLength(1);
-    return found[0];
-};
+import { makeGeometry, renderTrack } from '../helpers/track';
 
 describe('thumb sizing through the public styling API', () => {
-    // jest.setup.js installs fake timers globally, which stalls the
-    // testing-library auto-cleanup hook. These are pure render assertions.
-    beforeAll(() => jest.useRealTimers());
-    afterAll(() => jest.useFakeTimers());
-
-    const thumbColor = 'rgba(0,0,0,0.35)';
-    const defaultProps = {
-        containerHeight: 500,
-        contentHeight: 1000,
-        onScrollToPosition: jest.fn(),
-        scrollPosition: 0,
-        animatedScrollPosition: new Animated.Value(0),
-    };
-
     it('sizes the thumb proportionally when nothing is configured', () => {
-        const { toJSON } = render(
-            <ScrollProgressTrack {...defaultProps} styling={{ thumbColor }} />
-        );
-        expect(renderedThumbHeight(toJSON(), thumbColor)).toBe(250);
+        // 500 of 1000 visible -> half the track.
+        const view = renderTrack();
+
+        expect(view.thumb().height).toBe(250);
+    });
+
+    it('caps the proportional thumb at 80% of the track', () => {
+        // 500 of 550 visible would be 91% of the track.
+        const view = renderTrack({ geometry: makeGeometry({ container: 500, content: 550 }) });
+
+        expect(view.thumb().height).toBe(400);
     });
 
     it('honours styling.thumbHeight', () => {
-        const { toJSON } = render(
-            <ScrollProgressTrack
-                {...defaultProps}
-                styling={{ thumbColor, thumbHeight: 56 }}
-            />
-        );
-        expect(renderedThumbHeight(toJSON(), thumbColor)).toBe(56);
+        const view = renderTrack({ styling: { thumbHeight: 60 } });
+
+        expect(view.thumb().height).toBe(60);
     });
 
     it('honours styling.minThumbHeight on a long list', () => {
-        const { toJSON } = render(
-            <ScrollProgressTrack
-                {...defaultProps}
-                contentHeight={10000}
-                styling={{ thumbColor, minThumbHeight: 56 }}
-            />
-        );
-        expect(renderedThumbHeight(toJSON(), thumbColor)).toBe(56);
+        // 500 of 50000 visible would be a 5pt thumb.
+        const view = renderTrack({
+            geometry: makeGeometry({ container: 500, content: 50000 }),
+            styling: { minThumbHeight: 48 },
+        });
+
+        expect(view.thumb().height).toBe(48);
     });
 
     it('lets styling.thumbHeight win over styling.minThumbHeight', () => {
-        const { toJSON } = render(
-            <ScrollProgressTrack
-                {...defaultProps}
-                styling={{ thumbColor, thumbHeight: 20, minThumbHeight: 80 }}
-            />
-        );
-        expect(renderedThumbHeight(toJSON(), thumbColor)).toBe(20);
+        const view = renderTrack({ styling: { thumbHeight: 30, minThumbHeight: 48 } });
+
+        expect(view.thumb().height).toBe(30);
+    });
+
+    it('travels the room a fixed thumb leaves', () => {
+        const view = renderTrack({ styling: { thumbHeight: 100 } });
+
+        view.scrollTo(500);
+
+        expect(view.thumb().transform).toEqual([{ translateY: 400 }]);
     });
 });

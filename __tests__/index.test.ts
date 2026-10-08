@@ -1,69 +1,29 @@
-import {
-    ScrollProgressTrack,
-    useAnimatedScrollPosition,
-    useScrollTrack,
-    defaultScrollTrackOptions,
-} from '../src';
+import * as ScrollTrackLibrary from '../src/index';
 
-// Type-only imports for testing
-import type {
-    ScrollProgressTrackProps,
-    ScrollTrackOptions,
-} from '../src';
-
-describe('Library Exports', () => {
-    describe('Component exports', () => {
-        it('should export ScrollProgressTrack', () => {
-            expect(ScrollProgressTrack).toBeDefined();
-            expect(typeof ScrollProgressTrack).toBe('function');
-        });
+describe('library exports', () => {
+    it('exports the hook and its defaults', () => {
+        expect(typeof ScrollTrackLibrary.useScrollTrack).toBe('function');
+        expect(ScrollTrackLibrary.defaultScrollTrackOptions).toBeDefined();
     });
 
-    describe('Hook exports', () => {
-        it('should export useAnimatedScrollPosition', () => {
-            expect(useAnimatedScrollPosition).toBeDefined();
-            expect(typeof useAnimatedScrollPosition).toBe('function');
-        });
-
-        it('should export useScrollTrack', () => {
-            expect(useScrollTrack).toBeDefined();
-            expect(typeof useScrollTrack).toBe('function');
-        });
+    it('exports the tracked components', () => {
+        expect(typeof ScrollTrackLibrary.TrackedScrollView).toBe('function');
+        expect(typeof ScrollTrackLibrary.TrackedFlatList).toBe('function');
+        expect(typeof ScrollTrackLibrary.TrackedSectionList).toBe('function');
     });
 
-    describe('Configuration exports', () => {
-        it('should export defaultScrollTrackOptions', () => {
-            expect(defaultScrollTrackOptions).toBeDefined();
-            expect(typeof defaultScrollTrackOptions).toBe('object');
-
-            // Verify default values
-            expect(defaultScrollTrackOptions.alwaysVisible).toBe(false);
-            expect(defaultScrollTrackOptions.fadeOutDelay).toBe(1000);
-            expect(defaultScrollTrackOptions.scrollThrottle).toBe(1);
-            expect(defaultScrollTrackOptions.styling.thumbColor).toBe('#00CED1');
-            expect(defaultScrollTrackOptions.styling.trackWidth).toBe(4);
-        });
+    it('exports the track component', () => {
+        expect(ScrollTrackLibrary.ScrollProgressTrack).toBeDefined();
     });
 
-    describe('Type exports', () => {
-        it('should have proper TypeScript types', () => {
-            // This test ensures TypeScript compilation works
-            // Types are tested at compile time
-
-            const mockScrollProgressTrackProps: ScrollProgressTrackProps = {
-                containerHeight: 500,
-                contentHeight: 1000,
-                onScrollToPosition: jest.fn(),
-                scrollPosition: 0,
-            };
-
-            const mockScrollTrackOptions: ScrollTrackOptions = {
-                alwaysVisible: false,
-                fadeOutDelay: 1000,
-            };
-
-            expect(mockScrollProgressTrackProps).toBeDefined();
-            expect(mockScrollTrackOptions).toBeDefined();
-        });
+    it('exports nothing else', () => {
+        expect(Object.keys(ScrollTrackLibrary).sort()).toEqual([
+            'ScrollProgressTrack',
+            'TrackedFlatList',
+            'TrackedScrollView',
+            'TrackedSectionList',
+            'defaultScrollTrackOptions',
+            'useScrollTrack',
+        ]);
     });
 });

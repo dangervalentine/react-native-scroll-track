@@ -1,547 +1,225 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
-import { View, FlatList, ScrollView, Text } from 'react-native';
-import { useScrollTrack, type ScrollTrackOptions } from '../../src/hooks/useScrollTrack';
+import { FlatList, ScrollView, Text, View } from 'react-native';
+import { act, render } from '@testing-library/react-native';
 
-interface TestItem {
-    id: number;
-    text: string;
-}
+import { useScrollTrack, type ScrollTrackOptions } from '../../src';
+import { advance, gestureRegistry, lastPan, lastTap, styleOf } from '../helpers/track';
+import { scrollEvent } from '../helpers/scrollEvent';
 
-// Test component that uses the scroll track
-const TestFlatListComponent = ({
-    options,
-    data,
-}: {
-    options?: ScrollTrackOptions;
-    data: TestItem[];
-}) => {
+const DATA = Array.from({ length: 50 }, (_, i) => ({ id: String(i), title: `Item ${i}` }));
+
+/** The usage the README documents: the hook, spread onto a list, in a View. */
+const ListScreen = ({ options }: { options?: ScrollTrackOptions }) => {
     const { scrollProps, ScrollTrack } = useScrollTrack(options);
 
     return (
-        <View style={{ flex: 1 }} testID="container">
+        <View style={{ flex: 1 }}>
             <FlatList
                 {...scrollProps}
-                data={data}
-                renderItem={({ item }) => (
-                    <View style={{ height: 50 }} testID={`item-${item.id}`}>
-                        <Text>{item.text}</Text>
-                    </View>
-                )}
-                keyExtractor={(item) => item.id.toString()}
-                testID="flatlist"
+                data={DATA}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <Text>{item.title}</Text>}
             />
             {ScrollTrack}
         </View>
     );
 };
 
-const TestScrollViewComponent = ({
-    options,
-    contentHeight = 2000,
-}: {
-    options?: ScrollTrackOptions;
-    contentHeight?: number;
-}) => {
+const ScrollScreen = ({ options }: { options?: ScrollTrackOptions }) => {
     const { scrollProps, ScrollTrack } = useScrollTrack(options);
+    const { inverted: _inverted, ...props } = scrollProps;
 
     return (
-        <View style={{ flex: 1 }} testID="container">
-            <ScrollView
-                {...scrollProps}
-                testID="scrollview"
-            >
-                <View style={{ height: contentHeight }} testID="content">
-                    <Text>Scrollable content</Text>
-                </View>
+        <View style={{ flex: 1 }}>
+            <ScrollView {...props}>
+                <Text>Content</Text>
             </ScrollView>
             {ScrollTrack}
         </View>
     );
 };
 
-/**
- * Whether the track's gesture overlay is currently accepting touches. The
- * overlay is the childless node declaring pointerEvents; the visuals layer
- * declares it too, but holds the thumb.
- */
-const overlayAcceptsTouches = (track: any): boolean => {
-    if (!track) return false;
-    let accepts = false;
-    const walk = (node: any) => {
-        if (!node || typeof node !== 'object') return;
-        const children = node.children ?? [];
-        const pe = node.props?.pointerEvents;
-        if (pe && children.length === 0 && pe !== 'none') accepts = true;
-        children.forEach(walk);
+const setup = (ui: React.ReactElement, type: any = FlatList) => {
+    const view = render(ui);
+    const scrollable = () => view.UNSAFE_getByType(type);
+
+    return {
+        ...view,
+        scrollable,
+        measure: ({ container = 500, content = 1000 } = {}) => {
+            act(() => {
+                scrollable().props.onLayout({ nativeEvent: { layout: { height: container, y: 0 } } });
+                scrollable().props.onContentSizeChange(300, content);
+            });
+            advance(20);
+        },
+        scroll: (y: number) => {
+            act(() => {
+                scrollable().props.onScroll(scrollEvent({ y }));
+            });
+            advance(20);
+        },
+        thumb: () => styleOf(view.getByTestId('scroll-progress-track-thumb')),
+        hasTrack: () => view.queryByTestId('scroll-progress-track') !== null,
     };
-    walk(track);
-    return accepts;
 };
 
-describe('Integration Tests', () => {
-    const generateTestData = (count: number): TestItem[] =>
-        Array.from({ length: count }, (_, i) => ({ id: i, text: `Item ${i}` }));
+/** Runs a gesture callback and lets what it scheduled to the JS thread land. */
+const fire = (handler: (...args: any[]) => void, ...args: any[]) => {
+    handler(...args);
+    advance(20);
+};
 
+describe('integration', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
-        jest.clearAllTimers();
+        gestureRegistry.__reset();
     });
 
-    afterEach(() => {
-        jest.runOnlyPendingTimers();
-    });
+    describe('with a FlatList', () => {
+        it('mounts the track only while there is something to scroll', () => {
+            const screen = setup(<ListScreen />);
+            expect(screen.hasTrack()).toBe(false);
 
-    describe('FlatList Integration', () => {
-        it('should show scroll track when content is scrollable', () => {
-            const data = generateTestData(100);
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent data={data} />
-            );
+            screen.measure({ container: 500, content: 1000 });
+            expect(screen.hasTrack()).toBe(true);
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Initially no scroll track should be visible
-            expect(queryByTestId('scroll-progress-track')).toBeNull();
-
-            // Simulate container layout
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-            });
-
-            // Simulate FlatList layout
-            act(() => {
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-            });
-
-            // Simulate content size change (100 items * 50px = 5000px)
-            act(() => {
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Now scroll track should be visible
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
+            screen.measure({ container: 500, content: 400 });
+            expect(screen.hasTrack()).toBe(false);
         });
 
-        it('should hide scroll track when content is not scrollable', () => {
-            const data = generateTestData(5); // Small amount of data
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent data={data} />
-            );
+        it('shows the thumb on scroll, moves it, and hides it again', () => {
+            const screen = setup(<ListScreen />);
+            screen.measure();
+            expect(screen.thumb().opacity).toBe(0);
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
+            screen.scroll(250);
+            advance(200);
+            expect(screen.thumb().opacity).toBeCloseTo(0.8);
+            expect(screen.thumb().transform).toEqual([{ translateY: 125 }]);
 
-            // Simulate container layout
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-            });
-
-            // Simulate FlatList layout
-            act(() => {
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-            });
-
-            // Simulate content size change (5 items * 50px = 250px)
-            act(() => {
-                fireEvent(flatlist, 'contentSizeChange', 300, 250);
-            });
-
-            // Scroll track should not be visible
-            expect(queryByTestId('scroll-progress-track')).toBeNull();
+            advance(2000);
+            expect(screen.thumb().opacity).toBe(0);
         });
 
-        it('should handle scroll events and auto-hide', () => {
-            const data = generateTestData(100);
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent data={data} options={{ fadeOutDelay: 1000 }} />
-            );
+        it('keeps the thumb shown through a burst of scroll events', () => {
+            const screen = setup(<ListScreen />);
+            screen.measure();
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
+            for (let y = 20; y <= 500; y += 20) {
+                screen.scroll(y);
+                advance(100);
+            }
 
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Simulate scroll event
-            act(() => {
-                fireEvent(flatlist, 'scroll', {
-                    nativeEvent: {
-                        contentOffset: { y: 100 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 5000 },
-                    },
-                });
-            });
-
-            // Track should be visible after scroll
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
-
-            // Fast forward time to trigger auto-hide
-            act(() => {
-                jest.advanceTimersByTime(1000);
-            });
-
-            // Track should be hidden after timeout
-            // Note: This depends on the internal implementation details
-            // In a real test, we might need to check opacity or other visual indicators
-        });
-    });
-
-    describe('ScrollView Integration', () => {
-        it('should work with ScrollView', () => {
-            const { getByTestId, queryByTestId } = render(
-                <TestScrollViewComponent contentHeight={2000} />
-            );
-
-            const container = getByTestId('container');
-            const scrollview = getByTestId('scrollview');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(scrollview, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(scrollview, 'contentSizeChange', 300, 2000);
-            });
-
-            // Scroll track should be visible
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
+            expect(screen.thumb().opacity).toBeCloseTo(0.8);
+            expect(screen.thumb().transform).toEqual([{ translateY: 250 }]);
         });
 
-        it('should handle ScrollView scroll events', () => {
-            const { getByTestId } = render(
-                <TestScrollViewComponent contentHeight={2000} />
-            );
+        it('scrolls the list when the track is tapped', () => {
+            const screen = setup(<ListScreen />);
+            screen.measure();
+            const scrollToOffset = jest
+                .spyOn(FlatList.prototype, 'scrollToOffset')
+                .mockImplementation(() => {});
 
-            const container = getByTestId('container');
-            const scrollview = getByTestId('scrollview');
+            fire(lastTap().handlers.onEnd, { y: 250 }, true);
 
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(scrollview, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(scrollview, 'contentSizeChange', 300, 2000);
-            });
-
-            // Simulate scroll event
-            act(() => {
-                fireEvent(scrollview, 'scroll', {
-                    nativeEvent: {
-                        contentOffset: { y: 200 },
-                        layoutMeasurement: { height: 500 },
-                        contentSize: { height: 2000 },
-                    },
-                });
-            });
-
-            // Should not crash and should handle the scroll event
-            expect(getByTestId('scrollview')).toBeTruthy();
-        });
-    });
-
-    describe('Gesture Integration', () => {
-        it('should handle tap gestures on scroll track', () => {
-            const data = generateTestData(100);
-            const { getByTestId } = render(
-                <TestFlatListComponent data={data} />
-            );
-
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Mock the scroll methods
-            const scrollToOffset = jest.fn();
-            const scrollTo = jest.fn();
-            const getScrollResponder = jest.fn(() => ({ scrollTo }));
-
-            // We need to access the ref to mock it
-            // In a real scenario, this would be handled by the component
-            // For now, we'll just verify the component renders without crashing
-            expect(getByTestId('flatlist')).toBeTruthy();
+            expect(scrollToOffset).toHaveBeenCalledWith({ offset: 250, animated: true });
+            scrollToOffset.mockRestore();
         });
 
-        it('should handle drag gestures on scroll track', () => {
-            const data = generateTestData(100);
-            const { getByTestId } = render(
-                <TestFlatListComponent data={data} />
-            );
+        it('scrolls the list without animation, thumb under the finger, when dragged', () => {
+            const screen = setup(<ListScreen />);
+            screen.measure();
+            const scrollToOffset = jest
+                .spyOn(FlatList.prototype, 'scrollToOffset')
+                .mockImplementation(() => {});
+            const { handlers } = lastPan();
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onStart, { y: 110 });
+            fire(handlers.onUpdate, { y: 375 });
 
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
+            expect(scrollToOffset).toHaveBeenLastCalledWith({ offset: 375, animated: false });
+            expect(screen.thumb().transform).toEqual([{ translateY: 187.5 }]);
 
-            // Component should render without crashing
-            expect(getByTestId('flatlist')).toBeTruthy();
-        });
-    });
-
-    describe('Inverted List Integration', () => {
-        it('should work with inverted FlatList', () => {
-            const data = generateTestData(100);
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent data={data} options={{ inverted: true }} />
-            );
-
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Scroll track should be visible
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
-        });
-    });
-
-    describe('Custom Options Integration', () => {
-        it('should work with alwaysVisible option', () => {
-            const data = generateTestData(100);
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent data={data} options={{ alwaysVisible: true }} />
-            );
-
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Scroll track should be visible
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
-
-            // Should remain visible even after long time
-            act(() => {
-                jest.advanceTimersByTime(5000);
-            });
-
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
+            fire(handlers.onFinalize);
+            scrollToOffset.mockRestore();
         });
 
-        it('should work with custom styling', () => {
-            const data = generateTestData(100);
-            const customStyling = {
-                thumbColor: '#ff0000',
-                trackColor: '#00ff00',
-                trackWidth: 8,
-            };
+        it('passes disableTap and touchWidth through to the track', () => {
+            const screen = setup(<ListScreen options={{ disableTap: true, touchWidth: 8 }} />);
+            screen.measure();
 
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent
-                    data={data}
-                    options={{ styling: customStyling }}
-                />
-            );
-
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Scroll track should be visible with custom styling
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
+            expect(lastTap()).toBeUndefined();
+            expect(styleOf(screen.getByTestId('scroll-progress-track-gestures')).width).toBe(8);
         });
 
-        it('should handle callback functions', () => {
+        it('runs the consumer callbacks around a press', () => {
             const onPressStart = jest.fn();
             const onPressEnd = jest.fn();
-            const data = generateTestData(100);
+            const screen = setup(<ListScreen options={{ onPressStart, onPressEnd }} />);
+            screen.measure();
+            const { handlers } = lastPan();
 
-            const { getByTestId } = render(
-                <TestFlatListComponent
-                    data={data}
-                    options={{ onPressStart, onPressEnd }}
-                />
-            );
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onFinalize);
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Callbacks should be passed through correctly
-            expect(onPressStart).not.toHaveBeenCalled();
-            expect(onPressEnd).not.toHaveBeenCalled();
+            expect(onPressStart).toHaveBeenCalledTimes(1);
+            expect(onPressEnd).toHaveBeenCalledTimes(1);
         });
 
-        it('should handle custom minScrollDistanceToShow', () => {
-            const data = generateTestData(10); // Moderate amount of data
-            const { getByTestId, queryByTestId } = render(
-                <TestFlatListComponent
-                    data={data}
-                    options={{ minScrollDistanceToShow: 100 }}
-                />
+        it('inverts the list and the track together', () => {
+            const screen = setup(<ListScreen options={{ inverted: true }} />);
+            screen.measure();
+
+            expect(screen.scrollable().props.inverted).toBe(true);
+            expect(screen.thumb().transform).toEqual([{ translateY: 250 }]);
+        });
+
+        it('applies alwaysVisible and styling', () => {
+            const screen = setup(
+                <ListScreen options={{ alwaysVisible: true, styling: { thumbColor: '#ff0000' } }} />
             );
+            screen.measure();
+            advance(5000);
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
+            expect(screen.thumb()).toMatchObject({ opacity: 0.8, backgroundColor: '#ff0000' });
+        });
 
-            // Setup content that's scrollable but below threshold
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 550); // Only 50px difference
-            });
+        it('honours minScrollDistanceToShow', () => {
+            const screen = setup(<ListScreen options={{ minScrollDistanceToShow: 100 }} />);
 
-            // Below the threshold the track is inert: it may be mounted, but it
-            // neither shows nor accepts touches on the right edge.
-            expect(overlayAcceptsTouches(queryByTestId('scroll-progress-track'))).toBe(false);
+            screen.measure({ container: 500, content: 580 });
+            expect(screen.hasTrack()).toBe(false);
 
-            // Now make it more scrollable
-            act(() => {
-                fireEvent(flatlist, 'contentSizeChange', 300, 650); // 150px difference
-            });
+            screen.measure({ container: 500, content: 620 });
+            expect(screen.hasTrack()).toBe(true);
+        });
 
-            // Past the threshold the track becomes usable (150 > 100)
-            expect(queryByTestId('scroll-progress-track')).not.toBeNull();
+        it('unmounts cleanly with a fade still pending', () => {
+            const screen = setup(<ListScreen />);
+            screen.measure();
+            screen.scroll(200);
+
+            expect(() => {
+                screen.unmount();
+                advance(5000);
+            }).not.toThrow();
         });
     });
 
-    describe('Performance and Memory', () => {
-        it('should handle rapid scroll events without crashing', () => {
-            const data = generateTestData(100);
-            const { getByTestId } = render(
-                <TestFlatListComponent data={data} />
-            );
+    describe('with a ScrollView', () => {
+        it('tracks a scroll view the same way', () => {
+            const screen = setup(<ScrollScreen />, ScrollView);
+            screen.measure({ container: 400, content: 1200 });
 
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
+            screen.scroll(800);
+            advance(200);
 
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Simulate rapid scroll events
-            act(() => {
-                for (let i = 0; i < 100; i++) {
-                    fireEvent(flatlist, 'scroll', {
-                        nativeEvent: {
-                            contentOffset: { y: i * 10 },
-                            layoutMeasurement: { height: 500 },
-                            contentSize: { height: 5000 },
-                        },
-                    });
-                }
-            });
-
-            // Should not crash
-            expect(getByTestId('flatlist')).toBeTruthy();
-        });
-
-        it('should handle component unmounting gracefully', () => {
-            const data = generateTestData(100);
-            const { getByTestId, unmount } = render(
-                <TestFlatListComponent data={data} />
-            );
-
-            const container = getByTestId('container');
-            const flatlist = getByTestId('flatlist');
-
-            // Setup scrollable content
-            act(() => {
-                fireEvent(container, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'layout', {
-                    nativeEvent: { layout: { height: 500, width: 300 } },
-                });
-                fireEvent(flatlist, 'contentSizeChange', 300, 5000);
-            });
-
-            // Unmount component
-            expect(() => {
-                unmount();
-            }).not.toThrow();
+            // 400 of 1200 visible: a 133pt thumb at the bottom of its travel.
+            expect(screen.thumb().height).toBeCloseTo(400 / 3);
+            expect(screen.thumb().transform[0].translateY).toBeCloseTo(400 - 400 / 3);
+            expect(screen.thumb().opacity).toBeCloseTo(0.8);
         });
     });
 });

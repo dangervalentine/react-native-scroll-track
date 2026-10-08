@@ -1,19 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-    Animated,
-    Platform,
-    StyleSheet,
-    View,
-} from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Platform, StyleSheet } from "react-native";
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+    Easing,
+    Extrapolation,
+    cancelAnimation,
+    interpolate,
+    useAnimatedReaction,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withSequence,
+    withTiming,
+    type SharedValue,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
+import { useStableCallback } from './hooks/useStableCallback';
 import { resolveThumbHeight } from './utils/resolveThumbHeight';
 
 /**
  * A scrub only crosses to the JS thread once the finger has moved this far,
- * in pixels or as a fraction of the track. Every crossing costs a scrollTo and
- * a timer reset, and at 60fps most frames move the finger by less than this.
+ * in pixels or as a fraction of the track. Every crossing costs a scrollTo,
+ * and at 60fps most frames move the finger by less than this.
  */
 const SCRUB_MIN_PX = Platform.OS === 'android' ? 12 : 4;
 const SCRUB_MIN_RATIO = Platform.OS === 'android' ? 0.006 : 0.004;
@@ -25,44 +34,52 @@ const ACTIVE_OFFSET_Y = 6;
 
 /**
  * Android reserves the right edge for the system back gesture, so the touch
- * target is shifted inward and widened to stay comfortable.
+ * target is shifted inward by this much.
  */
 const ANDROID_BACK_GUTTER = 4;
-const ANDROID_TOUCH_WIDTH = 18;
-const MIN_TOUCH_WIDTH = 22;
+/** The width of the strip that takes touches when `touchWidth` is not set. */
+const DEFAULT_TOUCH_WIDTH = Platform.OS === 'android' ? 18 : 22;
+
+/** Fade timings, in milliseconds. */
+const SHOW_DURATION = 120;
+const HIDE_DURATION = 400;
 
 /**
- * Keeps a stable identity for a callback that may be re-created on every render
- * by the consumer, so caching a gesture does not pin it to a stale closure.
+ * The scroll offset has to move this far before the show/hide animation is
+ * re-armed, so a scroll does not start a new animation on every frame.
  */
-const useStableCallback = <Args extends any[]>(
-    callback?: (...args: Args) => void
-) => {
-    const ref = useRef(callback);
-
-    useEffect(() => {
-        ref.current = callback;
-    });
-
-    return useCallback((...args: Args) => {
-        ref.current?.(...args);
-    }, []);
-};
+const SHOW_MIN_SCROLL_PX = 12;
 
 export interface ScrollProgressTrackProps {
+    /** Current scroll offset of the scrollable, in pixels. */
+    scrollY: SharedValue<number>;
+    /** Height of the scrollable's viewport. */
+    containerHeight: SharedValue<number>;
+    /** Total height of the scrollable's content. */
+    contentHeight: SharedValue<number>;
+    /** Top of the scrollable inside the view the track is positioned against. Default: 0 */
+    containerOffsetY?: SharedValue<number>;
+    /**
+     * Called on the JS thread with a position from 0 to 1. `animated` is false
+     * while the thumb is being dragged and true for a tap on the track.
+     */
+    onScrollToPosition: (position: number, animated: boolean) => void;
     alwaysVisible?: boolean;
-    animatedScrollPosition?: Animated.Value;
-    containerHeight: number;
-    contentHeight: number;
+    /** Turns off both the tap and the drag. Default: false */
     disableGestures?: boolean;
+    /** Turns off tapping the track to jump; the thumb can still be dragged. Default: false */
+    disableTap?: boolean;
+    /**
+     * Width in pixels of the strip along the edge that takes touches, never
+     * narrower than the track. Default: 22 on iOS, 18 on Android
+     */
+    touchWidth?: number;
+    /** Delay in milliseconds before the track fades out. Default: 1000 */
+    fadeOutDelay?: number;
     hitSlop?: number;
     inverted?: boolean;
-    onDragStart?: () => void;
-    onDragEnd?: () => void;
     onPressStart?: () => void;
     onPressEnd?: () => void;
-    onScrollToPosition: (position: number) => void;
-    scrollPosition: number;
     /** Identifier for locating the track in tests. Default: 'scroll-progress-track' */
     testID?: string;
     styling?: {
@@ -83,26 +100,25 @@ export interface ScrollProgressTrackProps {
             offset?: { width: number; height: number };
         };
     };
-    visible?: boolean;
 }
 
 const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
-    alwaysVisible = false,
-    animatedScrollPosition,
+    scrollY,
     containerHeight,
     contentHeight,
+    containerOffsetY,
+    onScrollToPosition,
+    alwaysVisible = false,
     disableGestures = false,
+    disableTap = false,
+    touchWidth,
+    fadeOutDelay = 1000,
     hitSlop = 22,
     inverted = false,
-    onDragEnd,
-    onDragStart,
     onPressEnd,
     onPressStart,
-    onScrollToPosition,
-    scrollPosition,
     styling = {},
     testID = 'scroll-progress-track',
-    visible = true,
 }) => {
     const {
         thumbBorderRadius = 0,
@@ -118,98 +134,128 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
         },
         trackVisible = true,
         zIndex = 1000,
+        thumbHeight: fixedThumbHeight,
+        minThumbHeight,
     } = styling;
 
-    const trackWidthProp = styling.trackWidth ?? 4;
+    const trackWidth = styling.trackWidth ?? 4;
+    const shadowOpacity = thumbShadow.opacity || 0.3;
+    const shadowRadius = thumbShadow.radius || 4;
 
-    const [isDragging, setIsDragging] = useState(false);
-    const [isPressed, setIsPressed] = useState(false);
-    /**
-     * Whether the gesture overlay accepts touches. The overlay spans a strip of
-     * the right edge, so leaving it live while the track is faded out would
-     * silently swallow taps meant for the content underneath.
-     */
-    const [isInteractive, setIsInteractive] = useState(alwaysVisible || visible);
+    /** 0 = faded out, 1 = fully shown. Scales the track and thumb opacity. */
+    const visibility = useSharedValue(alwaysVisible ? 1 : 0);
+    /** 1 while the thumb is being dragged. */
+    const isDragging = useSharedValue(0);
 
     // Scrub bookkeeping, read and written from the gesture worklets.
     const gestureLastY = useSharedValue(0);
     const lastSentY = useSharedValue(0);
     const lastSentRatio = useSharedValue(-1);
+    const lastShownScroll = useSharedValue(0);
 
-    const trackOpacityValue = useRef(new Animated.Value(0)).current;
-    const thumbOpacityValue = useRef(new Animated.Value(0)).current;
-    const internalScrollPosition = useRef(new Animated.Value(scrollPosition)).current;
+    /**
+     * Whether the gesture overlay accepts touches. The overlay spans a strip of
+     * the right edge, so leaving it live while the track is faded out would
+     * silently swallow taps meant for the content underneath.
+     */
+    const [isInteractive, setIsInteractive] = useState(alwaysVisible);
 
     useEffect(() => {
-        if (!animatedScrollPosition) {
-            Animated.timing(internalScrollPosition, {
-                toValue: scrollPosition,
-                duration: 0,
-                useNativeDriver: false,
-            }).start();
+        cancelAnimation(visibility);
+        visibility.value = alwaysVisible ? 1 : 0;
+    }, [alwaysVisible, visibility]);
+
+    // Show on scroll, then fade out once scrolling stops. A scrub and a
+    // programmatic scroll both move the offset, so they show the track too.
+    useAnimatedReaction(
+        () => scrollY.value,
+        (current, previous) => {
+            // The first reading only records where the scrollable starts.
+            if (previous === null) {
+                lastShownScroll.value = current;
+                return;
+            }
+            if (current === previous || alwaysVisible) return;
+            if (isDragging.value === 1) return;
+            if (Math.abs(current - lastShownScroll.value) < SHOW_MIN_SCROLL_PX) return;
+            lastShownScroll.value = current;
+
+            const hide = withDelay(
+                fadeOutDelay,
+                withTiming(0, { duration: HIDE_DURATION, easing: Easing.in(Easing.quad) })
+            );
+            visibility.value =
+                visibility.value < 1
+                    ? withSequence(
+                          withTiming(1, { duration: SHOW_DURATION, easing: Easing.out(Easing.quad) }),
+                          hide
+                      )
+                    : hide;
+        },
+        [alwaysVisible, fadeOutDelay]
+    );
+
+    // Accept touches as soon as the track starts appearing and until it has
+    // fully faded out, so a half-visible thumb is still grabbable. This crosses
+    // to JS at most twice per visibility cycle.
+    useAnimatedReaction(
+        () => visibility.value > 0,
+        (shown, wasShown) => {
+            if (shown === wasShown) return;
+            scheduleOnRN(setIsInteractive, shown);
         }
-    }, [scrollPosition, animatedScrollPosition]);
+    );
 
-    useEffect(() => {
-        const shouldShow = alwaysVisible || visible;
-        const targetTrackOpacity = shouldShow ? trackOpacity : 0;
-        const targetThumbOpacity = shouldShow ? thumbOpacity : 0;
-        // Skip fade animation during any press interaction (drag or tap)
-        const duration = alwaysVisible || isPressed ? 0 : 400;
+    const containerStyle = useAnimatedStyle(() => ({
+        top: containerOffsetY ? containerOffsetY.value : 0,
+        height: containerHeight.value,
+    }));
 
-        // Accept touches as soon as the track starts appearing, but keep them
-        // until it has fully faded out, so a half-visible thumb is still
-        // grabbable. This flips at most twice per visibility cycle.
-        if (shouldShow) setIsInteractive(true);
+    const trackStyle = useAnimatedStyle(() => ({
+        opacity: visibility.value * trackOpacity,
+    }));
 
-        Animated.parallel([
-            Animated.timing(trackOpacityValue, {
-                toValue: targetTrackOpacity,
-                duration,
-                useNativeDriver: true,
-            }),
-            Animated.timing(thumbOpacityValue, {
-                toValue: targetThumbOpacity,
-                duration,
-                useNativeDriver: true,
-            }),
-        ]).start(({ finished }) => {
-            if (finished && !shouldShow) setIsInteractive(false);
+    const thumbStyle = useAnimatedStyle(() => {
+        const available = containerHeight.value;
+        const height = resolveThumbHeight({
+            availableHeight: available,
+            containerHeight: containerHeight.value,
+            contentHeight: contentHeight.value,
+            thumbHeight: fixedThumbHeight,
+            minThumbHeight,
         });
-    }, [alwaysVisible, visible, trackOpacity, thumbOpacity, isPressed]);
+        const maxThumbPosition = Math.max(0, available - height);
+        const scrollRange = Math.max(1, contentHeight.value - containerHeight.value);
+        const dragging = isDragging.value === 1;
 
-    const availableHeight = Math.max(100, containerHeight);
-
-    const currentThumbHeight = resolveThumbHeight({
-        availableHeight,
-        containerHeight,
-        contentHeight,
-        thumbHeight: styling.thumbHeight,
-        minThumbHeight: styling.minThumbHeight,
+        return {
+            height,
+            opacity: visibility.value * thumbOpacity,
+            transform: [
+                {
+                    translateY: interpolate(
+                        scrollY.value,
+                        [0, scrollRange],
+                        inverted ? [maxThumbPosition, 0] : [0, maxThumbPosition],
+                        Extrapolation.CLAMP
+                    ),
+                },
+            ],
+            shadowOpacity: dragging ? Math.min(shadowOpacity * 1.3, 1) : shadowOpacity,
+            shadowRadius: dragging ? shadowRadius * 1.5 : shadowRadius,
+        };
     });
-    const maxThumbPosition = Math.max(0, availableHeight - currentThumbHeight);
-    const activeScrollPosition = animatedScrollPosition || internalScrollPosition;
-    const scrollRange = Math.max(1, contentHeight - containerHeight);
-
-    const animatedThumbPosition = activeScrollPosition.interpolate({
-        inputRange: animatedScrollPosition ? [0, scrollRange] : [0, 1],
-        outputRange: inverted ? [maxThumbPosition, 0] : [0, maxThumbPosition],
-        extrapolate: 'clamp',
-    });
-
 
     // Stable identities so an inline handler from the consumer does not
     // invalidate the cached gesture on every render.
-    const scrollTo = useStableCallback<[number]>(onScrollToPosition);
-    const safeOnDragStart = useStableCallback(onDragStart);
-    const safeOnDragEnd = useStableCallback(onDragEnd);
+    const scrollTo = useStableCallback<[number, boolean]>(onScrollToPosition);
     const safeOnPressStart = useStableCallback(onPressStart);
     const safeOnPressEnd = useStableCallback(onPressEnd);
 
     const gesture = useMemo(() => {
-        const trackLength = Math.max(1, availableHeight);
         const positionAt = (y: number) => {
             'worklet';
+            const trackLength = Math.max(1, containerHeight.value);
             const raw = Math.max(0, Math.min(1, y / trackLength));
             return inverted ? 1 - raw : raw;
         };
@@ -230,24 +276,32 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
                 gestureLastY.value = e.y;
                 lastSentY.value = e.y;
                 lastSentRatio.value = -1;
-                runOnJS(safeOnDragStart)();
-                runOnJS(safeOnPressStart)();
+                scheduleOnRN(safeOnPressStart);
+            })
+            .onStart(() => {
+                'worklet';
+                isDragging.value = 1;
+                if (!alwaysVisible) {
+                    visibility.value = withTiming(1, {
+                        duration: SHOW_DURATION,
+                        easing: Easing.out(Easing.quad),
+                    });
+                }
             })
             .onUpdate((e) => {
                 'worklet';
                 gestureLastY.value = e.y;
-
                 const pos = positionAt(e.y);
 
-                // Movement gate: every crossing to JS costs a scrollTo and a
-                // timer reset, and most frames move the finger barely at all.
+                // Movement gate: every crossing to JS costs a scrollTo, and
+                // most frames move the finger barely at all.
                 const movedPx = Math.abs(e.y - lastSentY.value);
                 const movedRatio = Math.abs(pos - lastSentRatio.value);
                 if (movedPx < SCRUB_MIN_PX && movedRatio < SCRUB_MIN_RATIO) return;
 
                 lastSentY.value = e.y;
                 lastSentRatio.value = pos;
-                runOnJS(scrollTo)(pos);
+                scheduleOnRN(scrollTo, pos, false);
             })
             .onFinalize(() => {
                 'worklet';
@@ -256,119 +310,107 @@ const ScrollProgressTrack: React.FC<ScrollProgressTrackProps> = ({
                 // few frames of the scrub.
                 if (gestureLastY.value !== lastSentY.value) {
                     lastSentY.value = gestureLastY.value;
-                    runOnJS(scrollTo)(positionAt(gestureLastY.value));
+                    scheduleOnRN(scrollTo, positionAt(gestureLastY.value), false);
                 }
 
-                runOnJS(safeOnDragEnd)();
-                runOnJS(safeOnPressEnd)();
+                if (isDragging.value === 1) {
+                    isDragging.value = 0;
+                    if (!alwaysVisible) {
+                        visibility.value = withDelay(
+                            fadeOutDelay,
+                            withTiming(0, { duration: HIDE_DURATION, easing: Easing.in(Easing.quad) })
+                        );
+                    }
+                }
+                scheduleOnRN(safeOnPressEnd);
             });
 
+        if (disableTap) return pan;
+
         const tap = Gesture.Tap()
-            .maxDistance(20)  // matches your previous maxDist
+            .maxDistance(20)
             .hitSlop(hitSlop)
-            .onBegin(() => {
+            .onEnd((e, success) => {
                 'worklet';
-                runOnJS(safeOnPressStart)();
-            })
-            .onEnd((e) => {
-                'worklet';
-                runOnJS(scrollTo)(positionAt(e.y));
-                runOnJS(safeOnPressEnd)();
+                if (!success) return;
+                scheduleOnRN(scrollTo, positionAt(e.y), true);
             });
 
         return Gesture.Simultaneous(tap, pan);
         // The callbacks and shared values are stable by construction, so the
-        // gesture only needs rebuilding when the track geometry changes.
+        // gesture only needs rebuilding when its configuration changes.
     }, [
-        availableHeight,
+        alwaysVisible,
+        disableTap,
+        fadeOutDelay,
         hitSlop,
         inverted,
+        containerHeight,
         gestureLastY,
+        isDragging,
         lastSentY,
         lastSentRatio,
+        visibility,
         scrollTo,
-        safeOnDragStart,
-        safeOnDragEnd,
         safeOnPressStart,
         safeOnPressEnd,
     ]);
 
-
-    if (containerHeight < 100 || contentHeight <= containerHeight) return null;
-
-    const visualWidth = Math.max(trackWidthProp, MIN_TOUCH_WIDTH);
-    const isAndroid = Platform.OS === 'android';
-    const gestureWidth = isAndroid ? ANDROID_TOUCH_WIDTH : visualWidth;
-    const gestureInset = isAndroid ? ANDROID_BACK_GUTTER : 0;
-
-    const Thumb = (
-        <Animated.View
-            style={[
-                styles.thumb,
-                {
-                    opacity: thumbOpacityValue,
-                    width: trackWidthProp,
-                    height: currentThumbHeight,
-                    position: "absolute",
-                    right: 0 - trackWidthProp / 2,
-                    transform: [
-                        { translateY: animatedThumbPosition },
-                    ],
-                    backgroundColor: thumbColor,
-                    borderRadius: thumbBorderRadius,
-                    shadowColor: thumbShadow.color,
-                    shadowOffset: thumbShadow.offset,
-                    shadowOpacity: isDragging ? Math.min((thumbShadow.opacity || 0.3) * 1.3, 1) : (thumbShadow.opacity || 0.3),
-                    shadowRadius: isDragging ? (thumbShadow.radius || 4) * 1.5 : (thumbShadow.radius || 4),
-                },
-            ]}
-        />
-    );
+    const gestureWidth = Math.max(trackWidth, touchWidth ?? DEFAULT_TOUCH_WIDTH);
+    const gestureInset = Platform.OS === 'android' ? ANDROID_BACK_GUTTER : 0;
+    // The container is as wide as everything inside it: Android does not
+    // deliver touches to a child that overflows its parent.
+    const containerWidth = disableGestures ? trackWidth : gestureWidth + gestureInset;
 
     return (
-        <View style={[styles.container, { zIndex }]} testID={testID}>
+        <Animated.View
+            style={[styles.container, { zIndex, width: containerWidth }, containerStyle]}
+            testID={testID}
+            pointerEvents="box-none"
+        >
             {trackVisible && (
                 <Animated.View
+                    testID={`${testID}-track`}
+                    pointerEvents="none"
                     style={[
                         styles.track,
-                        {
-                            opacity: trackOpacityValue,
-                            width: trackWidthProp,
-                            height: availableHeight,
-                            backgroundColor: trackColor,
-                        },
+                        { width: trackWidth, backgroundColor: trackColor },
+                        trackStyle,
                     ]}
                 />
             )}
 
-            {/* Visuals only. Kept out of the gesture overlay so the thumb is
-                never shifted by the platform's touch-target adjustments. */}
+            {/* The thumb sits flush with the edge, outside the gesture overlay,
+                so it is never shifted by the platform's touch-target adjustments. */}
             <Animated.View
-                style={[
-                    styles.pressableArea,
-                    { height: availableHeight, width: visualWidth },
-                ]}
+                testID={`${testID}-thumb`}
                 pointerEvents="none"
-            >
-                {Thumb}
-            </Animated.View>
+                style={[
+                    styles.thumb,
+                    {
+                        width: trackWidth,
+                        backgroundColor: thumbColor,
+                        borderRadius: thumbBorderRadius,
+                        shadowColor: thumbShadow.color,
+                        shadowOffset: thumbShadow.offset,
+                    },
+                    thumbStyle,
+                ]}
+            />
 
             {!disableGestures && (
                 <GestureDetector gesture={gesture}>
                     <Animated.View
+                        testID={`${testID}-gestures`}
                         style={[
-                            styles.pressableArea,
-                            {
-                                height: availableHeight,
-                                width: gestureWidth,
-                                right: gestureInset,
-                            },
+                            styles.touchStrip,
+                            { width: gestureWidth, right: gestureInset },
                         ]}
-                        pointerEvents={isInteractive || isPressed ? 'auto' : 'none'}
+                        pointerEvents={isInteractive ? 'auto' : 'none'}
                     />
                 </GestureDetector>
             )}
-        </View>
+        </Animated.View>
     );
 };
 
@@ -376,21 +418,22 @@ const styles = StyleSheet.create({
     container: {
         position: "absolute",
         right: 0,
-        top: 0,
-        bottom: 0,
-        alignItems: "center",
     },
     track: {
         position: "absolute",
-    },
-    pressableArea: {
-        position: "absolute",
-        justifyContent: "flex-start",
-        alignItems: "center",
+        top: 0,
+        bottom: 0,
         right: 0,
+    },
+    touchStrip: {
+        position: "absolute",
+        top: 0,
+        bottom: 0,
     },
     thumb: {
         position: "absolute",
+        top: 0,
+        right: 0,
         elevation: 4,
     },
 });

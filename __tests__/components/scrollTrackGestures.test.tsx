@@ -1,260 +1,368 @@
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { Animated } from 'react-native';
-import { Gesture } from 'react-native-gesture-handler';
-import ScrollProgressTrack from '../../src/ScrollProgressTrack';
+import { advance, gestureRegistry, lastPan, lastTap, panCount, renderTrack, styleOf } from '../helpers/track';
 
-const gestureRegistry = Gesture as unknown as {
-    __created: Array<{
-        kind: string;
-        handlers: Record<string, (event?: any) => void>;
-        config: Record<string, any>;
-    }>;
-    __reset: () => void;
-};
-
-const panGestures = () => gestureRegistry.__created.filter((g) => g.kind === 'pan');
-const lastPan = () => panGestures()[panGestures().length - 1];
-
-/**
- * The gesture overlay is the childless node declaring pointerEvents; the
- * visuals layer declares it too, but holds the thumb.
- */
-const overlayPointerEvents = (tree: any): string | undefined => {
-    const found: string[] = [];
-    const walk = (node: any) => {
-        if (!node || typeof node !== 'object') return;
-        const children = node.children || [];
-        if (node.props?.pointerEvents && children.length === 0) {
-            found.push(node.props.pointerEvents);
-        }
-        children.forEach(walk);
-    };
-    walk(tree);
-    expect(found).toHaveLength(1);
-    return found[0];
+/** Runs a gesture callback and lets what it scheduled to the JS thread land. */
+const fire = (handler: (...args: any[]) => void, ...args: any[]) => {
+    handler(...args);
+    advance(20);
 };
 
 describe('scroll track gestures', () => {
-    beforeAll(() => jest.useRealTimers());
-    afterAll(() => jest.useFakeTimers());
-
-    const defaultProps = {
-        containerHeight: 500,
-        contentHeight: 1000,
-        scrollPosition: 0,
-        animatedScrollPosition: new Animated.Value(0),
-    };
-
     beforeEach(() => {
         gestureRegistry.__reset();
-        jest.clearAllMocks();
+    });
+
+    describe('tap', () => {
+        it('jumps to the tapped position with an animated scroll', () => {
+            const view = renderTrack();
+
+            fire(lastTap().handlers.onEnd, { y: 125 }, true);
+
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(0.25, true);
+        });
+
+        it('mirrors the position when inverted', () => {
+            const view = renderTrack({ inverted: true });
+
+            fire(lastTap().handlers.onEnd, { y: 125 }, true);
+
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(0.75, true);
+        });
+
+        it('ignores a tap that did not complete', () => {
+            const view = renderTrack();
+
+            fire(lastTap().handlers.onEnd, { y: 125 }, false);
+
+            expect(view.onScrollToPosition).not.toHaveBeenCalled();
+        });
+
+        it('clamps a tap outside the track', () => {
+            const view = renderTrack();
+
+            fire(lastTap().handlers.onEnd, { y: -40 }, true);
+            fire(lastTap().handlers.onEnd, { y: 900 }, true);
+
+            expect(view.onScrollToPosition).toHaveBeenNthCalledWith(1, 0, true);
+            expect(view.onScrollToPosition).toHaveBeenNthCalledWith(2, 1, true);
+        });
+    });
+
+    describe('disableTap', () => {
+        it('builds no tap gesture, and keeps the drag', () => {
+            const view = renderTrack({ disableTap: true });
+
+            expect(lastTap()).toBeUndefined();
+
+            const { handlers } = lastPan();
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onStart, { y: 110 });
+            fire(handlers.onUpdate, { y: 250 });
+
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(0.5, false);
+        });
+
+        it('still reports presses', () => {
+            const onPressStart = jest.fn();
+            const onPressEnd = jest.fn();
+            renderTrack({ disableTap: true, onPressStart, onPressEnd });
+            const { handlers } = lastPan();
+
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onFinalize);
+
+            expect(onPressStart).toHaveBeenCalledTimes(1);
+            expect(onPressEnd).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('touch strip', () => {
+        const strip = (view: ReturnType<typeof renderTrack>) => styleOf(view.gestures());
+
+        it('is 22pt wide on iOS by default, flush with the edge', () => {
+            const view = renderTrack();
+
+            expect(strip(view)).toMatchObject({ width: 22, right: 0 });
+            expect(view.container().width).toBe(22);
+        });
+
+        it('takes its width from touchWidth', () => {
+            const view = renderTrack({ touchWidth: 8 });
+
+            expect(strip(view).width).toBe(8);
+            expect(view.container().width).toBe(8);
+        });
+
+        it('is never narrower than the track', () => {
+            const view = renderTrack({ touchWidth: 2, styling: { trackWidth: 6 } });
+
+            expect(strip(view).width).toBe(6);
+        });
+
+        it('shrinks the container to the track when gestures are off', () => {
+            const view = renderTrack({ disableGestures: true, styling: { trackWidth: 6 } });
+
+            expect(view.container().width).toBe(6);
+        });
     });
 
     describe('scrub gating', () => {
-        it('sends the first update of a scrub immediately', () => {
-            const onScrollToPosition = jest.fn();
-            render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-            );
-
+        it('sends the first update of a scrub immediately, without animation', () => {
+            const view = renderTrack();
             const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            onScrollToPosition.mockClear();
 
+            fire(handlers.onBegin, { y: 100 });
             // The pan only activates past activeOffsetY, so by the time an
             // update arrives the finger has already travelled; never gate it.
-            handlers.onUpdate({ y: 101 });
+            fire(handlers.onUpdate, { y: 101 });
 
-            expect(onScrollToPosition).toHaveBeenCalledTimes(1);
+            expect(view.onScrollToPosition).toHaveBeenCalledTimes(1);
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(101 / 500, false);
         });
 
         it('drops later updates that have not moved far enough to matter', () => {
-            const onScrollToPosition = jest.fn();
-            render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-            );
-
+            const view = renderTrack();
             const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            handlers.onUpdate({ y: 150 });
-            onScrollToPosition.mockClear();
 
-            // 1px and 1.5px on a 500px track: under both the pixel and ratio gates.
-            handlers.onUpdate({ y: 151 });
-            handlers.onUpdate({ y: 151.5 });
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onUpdate, { y: 110 });
+            view.onScrollToPosition.mockClear();
 
-            expect(onScrollToPosition).not.toHaveBeenCalled();
+            fire(handlers.onUpdate, { y: 110.5 });
+            fire(handlers.onUpdate, { y: 111 });
+
+            expect(view.onScrollToPosition).not.toHaveBeenCalled();
         });
 
         it('sends an update once the finger has moved a meaningful distance', () => {
-            const onScrollToPosition = jest.fn();
-            render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-            );
-
+            const view = renderTrack();
             const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            onScrollToPosition.mockClear();
 
-            handlers.onUpdate({ y: 150 });
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onUpdate, { y: 110 });
+            view.onScrollToPosition.mockClear();
 
-            expect(onScrollToPosition).toHaveBeenCalledTimes(1);
-            expect(onScrollToPosition).toHaveBeenCalledWith(0.3);
+            fire(handlers.onUpdate, { y: 160 });
+
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(160 / 500, false);
         });
 
         it('flushes the final position on release so the gate cannot swallow it', () => {
-            const onScrollToPosition = jest.fn();
-            render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-            );
-
+            const view = renderTrack();
             const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            handlers.onUpdate({ y: 150 });
-            onScrollToPosition.mockClear();
 
-            handlers.onUpdate({ y: 151 }); // gated
-            expect(onScrollToPosition).not.toHaveBeenCalled();
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onUpdate, { y: 110 });
+            fire(handlers.onUpdate, { y: 111 });
+            view.onScrollToPosition.mockClear();
 
-            handlers.onFinalize();
-            expect(onScrollToPosition).toHaveBeenCalledWith(151 / 500);
+            fire(handlers.onFinalize);
+
+            expect(view.onScrollToPosition).toHaveBeenCalledTimes(1);
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(111 / 500, false);
         });
 
         it('does not flush when the finger never moved', () => {
-            const onScrollToPosition = jest.fn();
-            render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={onScrollToPosition} />
-            );
-
+            const view = renderTrack();
             const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            onScrollToPosition.mockClear();
 
-            handlers.onFinalize();
-            expect(onScrollToPosition).not.toHaveBeenCalled();
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onFinalize);
+
+            expect(view.onScrollToPosition).not.toHaveBeenCalled();
         });
 
         it('respects inverted when gating and flushing', () => {
-            const onScrollToPosition = jest.fn();
-            render(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    inverted
-                    onScrollToPosition={onScrollToPosition}
-                />
-            );
-
+            const view = renderTrack({ inverted: true });
             const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            handlers.onUpdate({ y: 150 });
 
-            expect(onScrollToPosition).toHaveBeenCalledWith(1 - 0.3);
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onUpdate, { y: 150 });
+            expect(view.onScrollToPosition).toHaveBeenLastCalledWith(1 - 150 / 500, false);
+
+            fire(handlers.onUpdate, { y: 151 });
+            fire(handlers.onFinalize);
+            expect(view.onScrollToPosition).toHaveBeenLastCalledWith(1 - 151 / 500, false);
+        });
+
+        it('measures against the viewport as it is now', () => {
+            const view = renderTrack();
+            view.geometry.containerHeight.value = 250;
+            advance(20);
+
+            fire(lastTap().handlers.onEnd, { y: 125 }, true);
+
+            expect(view.onScrollToPosition).toHaveBeenCalledWith(0.5, true);
+        });
+    });
+
+    describe('dragging', () => {
+        it('shows the track for the length of a drag, then fades it out', () => {
+            const view = renderTrack({ fadeOutDelay: 1000 });
+            const { handlers } = lastPan();
+
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onStart, { y: 110 });
+            advance(200);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            // Held still for longer than the fade delay: still shown.
+            advance(5000);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            fire(handlers.onFinalize);
+            advance(900);
+            expect(view.thumb().opacity).toBeCloseTo(0.8);
+
+            advance(1000);
+            expect(view.thumb().opacity).toBe(0);
+        });
+
+        it('lifts the thumb shadow while dragging', () => {
+            const view = renderTrack();
+            const { handlers } = lastPan();
+            expect(view.thumb()).toMatchObject({ shadowOpacity: 0.3, shadowRadius: 4 });
+
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onStart, { y: 110 });
+            expect(view.thumb().shadowOpacity).toBeCloseTo(0.39);
+            expect(view.thumb().shadowRadius).toBe(6);
+
+            fire(handlers.onFinalize);
+            expect(view.thumb()).toMatchObject({ shadowOpacity: 0.3, shadowRadius: 4 });
+        });
+
+        it('leaves a touch that never became a drag alone', () => {
+            const view = renderTrack();
+            const { handlers } = lastPan();
+
+            fire(handlers.onBegin, { y: 100 });
+            fire(handlers.onFinalize);
+            advance(200);
+
+            expect(view.thumb().opacity).toBe(0);
+        });
+    });
+
+    describe('press callbacks', () => {
+        it('calls onPressStart on touch down and onPressEnd on release, once each', () => {
+            const onPressStart = jest.fn();
+            const onPressEnd = jest.fn();
+            renderTrack({ onPressStart, onPressEnd });
+            const { handlers } = lastPan();
+
+            fire(handlers.onBegin, { y: 100 });
+            expect(onPressStart).toHaveBeenCalledTimes(1);
+            expect(onPressEnd).not.toHaveBeenCalled();
+
+            fire(handlers.onFinalize);
+            expect(onPressStart).toHaveBeenCalledTimes(1);
+            expect(onPressEnd).toHaveBeenCalledTimes(1);
+        });
+
+        it('works without any callbacks', () => {
+            renderTrack();
+            const { handlers } = lastPan();
+
+            expect(() => {
+                fire(handlers.onBegin, { y: 100 });
+                fire(handlers.onStart, { y: 110 });
+                fire(handlers.onUpdate, { y: 150 });
+                fire(handlers.onFinalize);
+            }).not.toThrow();
         });
     });
 
     describe('gesture overlay interactivity', () => {
-        it('accepts touches while the track is visible', () => {
-            const { toJSON } = render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={jest.fn()} visible />
-            );
-            expect(overlayPointerEvents(toJSON())).toBe('auto');
+        const pointerEvents = (view: ReturnType<typeof renderTrack>) =>
+            view.gestures()?.props.pointerEvents;
+
+        it('ignores touches while the track is hidden', () => {
+            const view = renderTrack();
+
+            expect(pointerEvents(view)).toBe('none');
         });
 
-        it('goes inert once the track has faded out', () => {
-            const { toJSON } = render(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    onScrollToPosition={jest.fn()}
-                    visible={false}
-                />
-            );
-            expect(overlayPointerEvents(toJSON())).toBe('none');
+        it('accepts touches while the track is shown, and until it has faded out', () => {
+            const view = renderTrack({ fadeOutDelay: 1000 });
+
+            view.scrollTo(100);
+            advance(200);
+            expect(pointerEvents(view)).toBe('auto');
+
+            // Part-way through the fade: still grabbable.
+            advance(1000);
+            expect(pointerEvents(view)).toBe('auto');
+
+            advance(1000);
+            expect(pointerEvents(view)).toBe('none');
         });
 
         it('stays interactive when alwaysVisible is set', () => {
-            const { toJSON } = render(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    onScrollToPosition={jest.fn()}
-                    alwaysVisible
-                    visible={false}
-                />
-            );
-            expect(overlayPointerEvents(toJSON())).toBe('auto');
+            const view = renderTrack({ alwaysVisible: true });
+
+            advance(5000);
+
+            expect(pointerEvents(view)).toBe('auto');
+        });
+
+        it('renders no gesture overlay when gestures are disabled', () => {
+            const view = renderTrack({ disableGestures: true });
+
+            expect(view.gestures()).toBeNull();
         });
     });
 
     describe('gesture stability', () => {
         it('does not rebuild the gesture when unrelated props change', () => {
-            const { rerender } = render(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    onScrollToPosition={jest.fn()}
-                    styling={{ thumbColor: 'red' }}
-                />
-            );
-            expect(panGestures()).toHaveLength(1);
+            const view = renderTrack();
+            const before = panCount();
 
-            rerender(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    onScrollToPosition={jest.fn()}
-                    styling={{ thumbColor: 'blue' }}
-                />
-            );
+            view.update({ styling: { thumbColor: '#123456' } });
+            view.scrollTo(200);
 
-            expect(panGestures()).toHaveLength(1);
+            expect(panCount()).toBe(before);
         });
 
         it('does not rebuild the gesture for inline callbacks', () => {
-            const { rerender } = render(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    onScrollToPosition={() => { }}
-                    onPressStart={() => { }}
-                />
-            );
-            expect(panGestures()).toHaveLength(1);
+            const view = renderTrack({ onPressStart: () => {} });
+            const before = panCount();
 
-            rerender(
-                <ScrollProgressTrack
-                    {...defaultProps}
-                    onScrollToPosition={() => { }}
-                    onPressStart={() => { }}
-                />
-            );
+            view.update({ onPressStart: () => {}, onScrollToPosition: () => {} });
 
-            expect(panGestures()).toHaveLength(1);
+            expect(panCount()).toBe(before);
         });
 
         it('calls the latest callback even though the gesture is cached', () => {
             const first = jest.fn();
             const second = jest.fn();
+            const view = renderTrack({ onScrollToPosition: first });
 
-            const { rerender } = render(
-                <ScrollProgressTrack {...defaultProps} onScrollToPosition={first} />
-            );
-            rerender(<ScrollProgressTrack {...defaultProps} onScrollToPosition={second} />);
+            view.update({ onScrollToPosition: second });
+            fire(lastTap().handlers.onEnd, { y: 250 }, true);
 
-            const { handlers } = lastPan();
-            handlers.onBegin({ y: 100 });
-            handlers.onUpdate({ y: 150 });
-
-            expect(second).toHaveBeenCalledWith(0.3);
             expect(first).not.toHaveBeenCalled();
+            expect(second).toHaveBeenCalledWith(0.5, true);
         });
     });
 
     describe('edge-gesture guards', () => {
         it('fails the pan on horizontal movement so the back swipe wins', () => {
-            render(<ScrollProgressTrack {...defaultProps} onScrollToPosition={jest.fn()} />);
+            renderTrack();
+
             expect(lastPan().config.failOffsetX).toEqual([-4, 4]);
         });
 
         it('activates only after meaningful vertical movement', () => {
-            render(<ScrollProgressTrack {...defaultProps} onScrollToPosition={jest.fn()} />);
+            renderTrack();
+
             expect(lastPan().config.activeOffsetY).toEqual([-6, 6]);
+        });
+
+        it('applies hitSlop to both gestures', () => {
+            renderTrack({ hitSlop: 30 });
+
+            expect(lastPan().config.hitSlop).toBe(30);
+            expect(lastTap().config.hitSlop).toBe(30);
         });
     });
 });

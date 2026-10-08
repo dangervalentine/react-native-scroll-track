@@ -1,36 +1,5 @@
 import 'react-native-gesture-handler/jestSetup';
 
-// Mock React Native components
-jest.mock('react-native', () => {
-    const RN = jest.requireActual('react-native');
-
-    // Mock Animated
-    RN.Animated.Value = jest.fn(() => ({
-        setValue: jest.fn(),
-        addListener: jest.fn(() => 'mock-listener-id'),
-        removeListener: jest.fn(),
-        interpolate: jest.fn(() => ({
-            setValue: jest.fn(),
-            addListener: jest.fn(() => 'mock-listener-id'),
-            removeListener: jest.fn(),
-        })),
-    }));
-
-    RN.Animated.event = jest.fn((config, nativeConfig) => {
-        return jest.fn();
-    });
-
-    RN.Animated.timing = jest.fn(() => ({
-        start: jest.fn((callback) => callback?.({ finished: true })),
-    }));
-
-    RN.Animated.parallel = jest.fn(() => ({
-        start: jest.fn((callback) => callback?.({ finished: true })),
-    }));
-
-    return RN;
-});
-
 // Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => {
     const View = require('react-native').View;
@@ -97,58 +66,13 @@ jest.mock('react-native-gesture-handler', () => {
     };
 });
 
-// Mock react-native-reanimated
-jest.mock('react-native-reanimated', () => {
-    const Reanimated = require('react-native-reanimated/mock');
-    const { useRef } = require('react');
-
-    // Mock runOnJS
-    Reanimated.runOnJS = jest.fn((fn) => fn);
-
-    // The stock mock hands back a new object every render, which would reset
-    // any state a worklet keeps across gesture events. Persist it like the
-    // real hook does.
-    Reanimated.useSharedValue = (init) => {
-        const ref = useRef(null);
-        if (ref.current === null) ref.current = { value: init };
-        return ref.current;
-    };
-
-    // Likewise useAnimatedRef: the stock mock returns a fresh { current: null }
-    // each render, which would silently discard whatever was attached to it.
-    Reanimated.useAnimatedRef = () => {
-        const ref = useRef(null);
-        if (ref.current === null) ref.current = { current: null };
-        return ref.current;
-    };
-
-    return Reanimated;
-});
+// Reanimated runs for real: shared values, animated styles, reactions and
+// timing animations all work under Jest, and animations advance with the fake
+// timers below.
+require('react-native-reanimated').setUpTests();
 
 // Mock timers
 jest.useFakeTimers();
-
-// Global test utilities
-global.mockAnimatedValue = (initialValue = 0) => {
-    const listeners = [];
-    let currentValue = initialValue;
-
-    return {
-        setValue: jest.fn((value) => {
-            currentValue = value;
-            listeners.forEach(listener => listener({ value }));
-        }),
-        addListener: jest.fn((listener) => {
-            listeners.push(listener);
-            return listeners.length - 1;
-        }),
-        removeListener: jest.fn((id) => {
-            listeners.splice(id, 1);
-        }),
-        interpolate: jest.fn(() => global.mockAnimatedValue()),
-        getValue: () => currentValue,
-    };
-};
 
 // Mock console warnings for cleaner test output
 const originalWarn = console.warn;
